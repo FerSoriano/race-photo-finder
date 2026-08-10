@@ -63,6 +63,7 @@ place a payment check will later go.
 | [docs/DATA_MODEL.md](docs/DATA_MODEL.md) | Tables, indexes, and why they look like that |
 | [docs/WORKFLOW.md](docs/WORKFLOW.md) | Step-by-step race-day runbook |
 | [CLAUDE.md](CLAUDE.md) | Conventions for working in this repo |
+| [STATUS.md](STATUS.md) | What's done, what's pending, future phases |
 
 ## Configuration
 
