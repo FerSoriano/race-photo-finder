@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Environment
+.env
+.env.local
+*.local.md
+
+# Runtime data (local storage backend, generated derivatives, manifests)
+backend/var/
+manifest.json
+*.manifest.json
+
+# OS
+.DS_Store
+
+# Editors
+.idea/
+*.swp
