@@ -23,4 +23,5 @@ manifest.json
 
 # Editors
 .idea/
+.vscode/
 *.swp
