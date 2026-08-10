@@ -8,3 +8,5 @@ require frontend work, ask which stack to use before creating anything.
 
 Until then, the backend is consumed with plain HTTP calls; `docs/ARCHITECTURE.md`
 documents the endpoints.
+
+Agents do not commit or push. See the Git section in the root `CLAUDE.md`.

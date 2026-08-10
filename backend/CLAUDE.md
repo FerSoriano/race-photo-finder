@@ -3,6 +3,9 @@
 FastAPI + SQLAlchemy + Postgres, plus the `rpf` CLI. Package root:
 `backend/src/rpf/`.
 
+Agents do not commit or push -- including generated migrations. See the Git
+section in the root `CLAUDE.md`.
+
 ## Layering -- the rule that matters most
 
 ```
