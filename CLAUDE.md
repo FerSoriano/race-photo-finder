@@ -45,6 +45,20 @@ make help       # everything else
 `uv` manages Python; the venv lives at `backend/.venv`. Never call `pip`, never
 edit `.venv/`, never activate a venv manually -- prefix with `uv run`.
 
+## Git -- agents must not commit or push
+
+**Agents never run `git commit`, `git push`, `git merge`, `git rebase`,
+`git reset --hard`, or open a pull request.** Every one of those needs explicit,
+per-task approval from the user first -- previous approval does not carry over
+to the next change.
+
+Leave finished work in the working tree, say what changed, and let the user
+review and commit it. Staging (`git add`) is allowed only when the user asks for
+it. Read-only git (`status`, `diff`, `log`, `show`) is always fine.
+
+If a task seems to require a commit -- a migration, a release, a bisect -- stop
+and ask; do not commit "so the next step works".
+
 ## Conventions
 
 - Never commit `.env`, credentials, or bucket keys. `.env.example` is the
@@ -52,6 +66,8 @@ edit `.venv/`, never activate a venv manually -- prefix with `uv run`.
 - Migrations are generated (`make migration M="..."`), then **reviewed by hand**
   -- autogenerate misses extensions, raw-SQL indexes and data changes.
 - Commit messages: imperative mood, present tense (`Add bib search endpoint`).
+  Written by the user, or drafted for the user to approve -- see the Git rule
+  above.
 - Before declaring work done: `make lint && make test`.
 
 ## Non-obvious facts

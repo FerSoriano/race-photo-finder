@@ -23,7 +23,14 @@
     ],
     "deny": [
       "Read(./.env)",
-      "Read(./backend/.venv/**)"
+      "Read(./backend/.venv/**)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git merge:*)",
+      "Bash(git rebase:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(gh pr create:*)",
+      "Bash(gh pr merge:*)"
     ]
   }
 }
