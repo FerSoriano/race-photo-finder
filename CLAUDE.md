@@ -59,6 +59,18 @@ it. Read-only git (`status`, `diff`, `log`, `show`) is always fine.
 If a task seems to require a commit -- a migration, a release, a bisect -- stop
 and ask; do not commit "so the next step works".
 
+## Project status
+
+`STATUS.md` at the repo root tracks what's done, what's pending, and future
+phases, split into Backend and Frontend sections.
+
+- At the start of a session, read `STATUS.md` first and open with a short
+  summary of where the project stands and what's outstanding, before acting
+  on the user's request.
+- After finishing a task that changes project state (a feature, a fix, a
+  decision), ask the user whether to update `STATUS.md` to reflect it. Don't
+  edit it without asking first.
+
 ## Conventions
 
 - Never commit `.env`, credentials, or bucket keys. `.env.example` is the
@@ -67,7 +79,17 @@ and ask; do not commit "so the next step works".
   -- autogenerate misses extensions, raw-SQL indexes and data changes.
 - Commit messages: imperative mood, present tense (`Add bib search endpoint`).
   Written by the user, or drafted for the user to approve -- see the Git rule
-  above.
+  above. When drafting one:
+  - Use a Conventional Commits prefix -- `feat`, `fix`, `docs`, `refactor`,
+    `test`, `chore`, `perf`, `style`, `ci`, `build` -- followed by a gitmoji,
+    FastAPI-repo style: `feat: ✨ Add bib search endpoint`,
+    `fix: 🐛 Correct bib normalization for leading zeros`,
+    `docs: 📝 Document the S3 storage backend`.
+    Common pairs: `feat` ✨, `fix` 🐛, `docs` 📝, `refactor` ♻️, `test` ✅,
+    `chore` 🔧, `perf` ⚡️, `style` 🎨, `ci` 👷, `build` 📦.
+  - Keep it to two lines max. If the change genuinely needs more explanation
+    than that, ask the user before writing a longer message instead of
+    padding it out.
 - Before declaring work done: `make lint && make test`.
 
 ## Non-obvious facts

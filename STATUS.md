@@ -1,0 +1,61 @@
+# Project status
+
+Last updated: 2026-08-09
+
+Tracks what's done, what's pending, and future phases. Split into Backend and
+Frontend. See `CLAUDE.md` for the rule that keeps this current.
+
+## Backend
+
+### Done
+
+- Layered FastAPI app: `api/routes`, `services`, `repositories`, `schemas`,
+  `db`, `storage`, `detection`, `cli`.
+- DB schema (`events`, `photos`, `photo_bibs`) with an initial Alembic
+  migration.
+- Bib detection via local Ollama vision model (`qwen2.5vl:7b`), writing a
+  resumable `manifest.json` (`rpf detect`).
+- Upload pipeline: thumbnails + watermarked previews, idempotent by
+  SHA-256 (`rpf upload`).
+- Storage abstraction: local filesystem for dev, S3/R2 for prod, with the
+  private-originals / public-derivatives split enforced.
+- Bib search: exact match via indexed seek (0.165 ms measured), trigram
+  similarity fallback for near-misses (misread digits).
+- Dev stack: Postgres (host port 5433) + MinIO via `make up` / `migrate` /
+  `api`.
+- Unit + integration test suite (config, derivatives, manifest, normalize,
+  search, storage, API).
+- Docs: `docs/ARCHITECTURE.md`, `docs/DATA_MODEL.md`, `docs/WORKFLOW.md`.
+
+### Pending
+
+- Payment gating for downloads. README already marks the single endpoint
+  where this check will go; not implemented yet. Downloads are currently
+  free and unlimited by design.
+- Production deploy configuration (R2 credentials, hosting, etc.) not yet
+  set up.
+
+### Future phases
+
+- Paid downloads: first via bank transfer (`transferencia`), delivered by
+  email or a download code — payment provider not chosen yet.
+- ~~C/C++-accelerated search algorithm~~ — resolved: not needed. The
+  Postgres indexed seek already measures 0.165 ms; see `CLAUDE.md`
+  "Non-obvious facts".
+
+## Frontend
+
+### Done
+
+- Nothing yet — `frontend/` has a README only, no code (per root
+  `CLAUDE.md`, deliberately).
+
+### Pending
+
+- Choose the frontend stack.
+
+### Future phases
+
+- Event search, bib search UI, photo gallery with multi-select, download
+  flow.
+- Payment UI once a provider is chosen (see Backend future phases).
