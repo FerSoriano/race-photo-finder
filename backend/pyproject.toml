@@ -1,0 +1,57 @@
+[project]
+name = "race-photo-finder"
+version = "0.1.0"
+description = "Find race photos by runner bib number"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "sqlalchemy>=2.0",
+    "alembic>=1.14",
+    "psycopg[binary]>=3.2",
+    "boto3>=1.35",
+    "pillow>=11.0",
+    "typer>=0.15",
+    "httpx>=0.28",
+    "ollama>=0.4",
+    "python-multipart>=0.0.20",
+]
+
+[project.scripts]
+rpf = "rpf.cli.__main__:app"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.8",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rpf"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "SIM", "TID"]
+ignore = ["B008"]  # FastAPI Depends() in defaults is the documented pattern
+
+[tool.ruff.lint.isort]
+known-first-party = ["rpf"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+asyncio_mode = "auto"
+markers = [
+    "integration: requires postgres and/or minio to be running",
+]
