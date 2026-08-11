@@ -18,7 +18,17 @@ make migrate    # create the schema
 make api        # http://localhost:8000/docs
 ```
 
-Then, in another terminal, run the sample end to end:
+In another terminal, the frontend:
+
+```bash
+make front-setup   # npm install, create frontend/.env
+make front         # http://localhost:5173
+```
+
+(`make dev-all` runs backend + frontend together in one terminal, useful for a
+quick smoke test; `Ctrl+C` stops both.)
+
+Then run the sample end to end:
 
 ```bash
 make detect F=samples/photos E=test-event
@@ -33,7 +43,7 @@ curl -s "localhost:8000/v1/events/test-event/photos?bib=19131"
 
 ```
 backend/     FastAPI API + the `rpf` CLI (detect, upload)
-frontend/    Stack not chosen yet — see frontend/README.md
+frontend/    React + Vite + TypeScript SPA — see frontend/README.md
 docs/        Architecture, data model, race-day runbook
 samples/     Four test photos with known bib numbers
 ```
