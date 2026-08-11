@@ -29,16 +29,16 @@ Frontend. See `CLAUDE.md` for the rule that keeps this current.
 
 ### Pending
 
-- Payment gating for downloads. README already marks the single endpoint
-  where this check will go; not implemented yet. Downloads are currently
-  free and unlimited by design.
 - Production deploy configuration (R2 credentials, hosting, etc.) not yet
   set up.
 
 ### Future phases
 
-- Paid downloads: first via bank transfer (`transferencia`), delivered by
-  email or a download code — payment provider not chosen yet.
+- Payment gating for downloads (phase 2, not a current TODO). README already
+  marks the single endpoint where this check will go; not implemented yet.
+  Downloads are currently free and unlimited by design. First via bank
+  transfer (`transferencia`), delivered by email or a download code —
+  payment provider not chosen yet.
 - ~~C/C++-accelerated search algorithm~~ — resolved: not needed. The
   Postgres indexed seek already measures 0.165 ms; see `CLAUDE.md`
   "Non-obvious facts".
