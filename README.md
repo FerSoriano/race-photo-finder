@@ -84,3 +84,8 @@ bucket or builds a URL.
 
 Note: Postgres is exposed on host port **5433**, not 5432, to avoid colliding
 with a locally installed Postgres.
+
+## Acknowledgements
+
+Commit message style (Conventional Commits + gitmoji) is inspired by the
+[FastAPI](https://github.com/fastapi/fastapi) repository.
