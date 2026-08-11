@@ -50,6 +50,10 @@ class Settings(BaseSettings):
     s3_public_base_url: str | None = None
     # Lifetime of presigned URLs for private originals.
     presign_expires_seconds: int = 3600
+    # Cap on photos per bulk-download request. Each one mints a signed URL, so
+    # the cost is per-URL rather than per-byte -- but an uncapped list would be
+    # a free way to ask the API to sign an entire event.
+    max_bulk_download: int = 10
 
     # --- Image derivatives ---------------------------------------------
     thumb_max_px: int = 400

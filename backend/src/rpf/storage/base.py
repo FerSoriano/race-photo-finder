@@ -39,11 +39,21 @@ class StorageBackend(Protocol):
         """Return the object's bytes. Raises `FileNotFoundError` if absent."""
         ...
 
-    def url(self, key: str, visibility: Visibility = "private") -> str:
+    def url(
+        self,
+        key: str,
+        visibility: Visibility = "private",
+        download_filename: str | None = None,
+    ) -> str:
         """Return a URL a browser can fetch.
 
         Public objects get a stable CDN URL; private ones get a short-lived
         signed URL.
+
+        `download_filename` asks the browser to save the object under that name
+        instead of the storage key's. Keys are named after the photo id, so
+        without it a download lands as a UUID -- tolerable for one file, useless
+        for ten.
         """
         ...
 

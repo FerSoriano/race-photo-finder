@@ -5,9 +5,9 @@ import uuid
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import RedirectResponse
 
-from rpf.api.deps import DbSession, PublishedEvent, Storage
-from rpf.db.models import Photo
-from rpf.schemas.photos import PhotoSearchResult
+from rpf.api.deps import AppSettings, DbSession, PublishedEvent, Storage
+from rpf.schemas.photos import BulkDownloadRequest, BulkDownloadResult, PhotoSearchResult
+from rpf.services import download as download_service
 from rpf.services import search as search_service
 
 router = APIRouter(prefix="/v1/events/{slug}", tags=["photos"])
@@ -33,12 +33,35 @@ def download_original(
     db: DbSession,
     storage: Storage,
 ) -> RedirectResponse:
-    """Redirects to a short-lived signed URL for the private original.
+    """Redirects to a short-lived signed URL for the private original."""
+    try:
+        link = download_service.link_for_id(db, event, photo_id, storage)
+    except download_service.PhotosNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Photo not found"
+        ) from exc
+    return RedirectResponse(url=link.url)
 
-    Free and unlimited for now. This is the single choke point where the future
-    payment check goes -- everything else stays untouched.
+
+@router.post("/photos/download", response_model=BulkDownloadResult)
+def download_originals(
+    event: PublishedEvent,
+    payload: BulkDownloadRequest,
+    db: DbSession,
+    storage: Storage,
+    settings: AppSettings,
+) -> BulkDownloadResult:
+    """Signed URLs for a selection of photos, so the gallery can offer
+    "download the ones I ticked" in a single call.
+
+    The photos are fetched straight from object storage by the browser -- the
+    API only signs, so this stays cheap. Capped by MAX_BULK_DOWNLOAD.
     """
-    photo = db.get(Photo, photo_id)
-    if photo is None or photo.event_id != event.id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Photo not found")
-    return RedirectResponse(url=storage.url(photo.storage_key_original, visibility="private"))
+    try:
+        return download_service.build_links(db, event, payload.photo_ids, storage, settings)
+    except download_service.TooManyPhotosError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+    except download_service.PhotosNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc

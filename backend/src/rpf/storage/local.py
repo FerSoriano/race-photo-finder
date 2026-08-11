@@ -48,7 +48,16 @@ class LocalStorage:
             raise FileNotFoundError(key)
         return path.read_bytes()
 
-    def url(self, key: str, visibility: Visibility = "private") -> str:
+    def url(
+        self,
+        key: str,
+        visibility: Visibility = "private",
+        download_filename: str | None = None,
+    ) -> str:
+        # `download_filename` is accepted and ignored, like `visibility`: the
+        # /media static mount serves plain files and cannot set a
+        # Content-Disposition header. Downloads land under the key's name in
+        # development; on S3 the signed URL carries the real filename.
         return f"{self._public_base_url}/media/{key}"
 
     def exists(self, key: str, visibility: Visibility = "private") -> bool:
