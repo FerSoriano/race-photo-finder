@@ -7,6 +7,7 @@ rail for the swap-the-provider promise: any new backend must pass them.
 from __future__ import annotations
 
 import io
+import re
 from pathlib import Path
 
 import pytest
@@ -15,7 +16,7 @@ from rpf.config import Settings
 from rpf.storage.base import StorageBackend, build_key
 from rpf.storage.factory import build_storage
 from rpf.storage.local import LocalStorage
-from rpf.storage.s3 import S3Storage
+from rpf.storage.s3 import S3Storage, content_disposition
 
 
 @pytest.fixture
@@ -140,3 +141,47 @@ class TestBucketSeparation:
         ).url("events/r/original/a.jpg", visibility="private")
         assert "photos.example.com" not in url
         assert "X-Amz-Signature=" in url
+
+    def test_a_download_filename_is_signed_into_the_url(self):
+        """Keys are named after the photo id, so the real name rides along."""
+        url = self._storage(access_key_id="k", secret_access_key="s").url(
+            "events/r/original/a.jpg",
+            visibility="private",
+            download_filename="21k-gdl-3.jpg",
+        )
+        # Part of the signed query string, so it cannot be swapped in transit.
+        assert "response-content-disposition" in url.lower()
+        assert "21k-gdl-3.jpg" in url
+        assert "X-Amz-Signature=" in url
+
+    def test_no_disposition_is_added_when_no_filename_is_asked_for(self):
+        url = self._storage(access_key_id="k", secret_access_key="s").url(
+            "events/r/original/a.jpg", visibility="private"
+        )
+        assert "response-content-disposition" not in url.lower()
+
+
+class TestContentDisposition:
+    """`original_filename` comes from an upload and ends up in a response header."""
+
+    # attachment; filename="<no quote, backslash, slash or newline>"
+    WELL_FORMED = re.compile(r'^attachment; filename="[^"\\/\r\n]*"(; filename\*=UTF-8\'\'\S+)?$')
+
+    def test_a_plain_name_is_passed_through(self):
+        assert content_disposition("21k-gdl-3.jpg") == 'attachment; filename="21k-gdl-3.jpg"'
+
+    @pytest.mark.parametrize(
+        "hostile",
+        ['a".jpg', "a\r\nX-Evil: 1.jpg", "../../etc/passwd", "a\x00.jpg"],
+    )
+    def test_header_injection_characters_are_stripped(self, hostile):
+        assert self.WELL_FORMED.match(content_disposition(hostile))
+
+    def test_an_accented_name_also_gets_the_rfc_5987_form(self):
+        """Spanish race filenames are common; browsers prefer filename*."""
+        result = content_disposition("maratón.jpg")
+        assert "filename*=UTF-8''marat%C3%B3n.jpg" in result
+        assert self.WELL_FORMED.match(result)
+
+    def test_a_name_that_sanitises_to_nothing_still_yields_a_filename(self):
+        assert content_disposition("") == 'attachment; filename="download"'

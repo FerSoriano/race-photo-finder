@@ -38,6 +38,30 @@ class PhotoSearchResult(BaseModel):
     similar_bibs: list[str] = Field(default_factory=list)
 
 
+class BulkDownloadRequest(BaseModel):
+    """The photos a runner ticked in the gallery.
+
+    The upper bound is not declared here: it comes from
+    `Settings.max_bulk_download`, which a schema cannot read, so the service
+    enforces it.
+    """
+
+    photo_ids: list[uuid.UUID] = Field(min_length=1)
+
+
+class PhotoDownloadLink(BaseModel):
+    id: uuid.UUID
+    filename: str
+    # Short-lived and signed. The storage key it points at is never exposed.
+    url: str
+
+
+class BulkDownloadResult(BaseModel):
+    event_slug: str
+    expires_in: int  # seconds the links stay valid
+    photos: list[PhotoDownloadLink]
+
+
 class BibIngest(BaseModel):
     number: str = Field(max_length=16)
     is_uncertain: bool = False

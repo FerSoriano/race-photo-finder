@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from datetime import datetime
 
 from sqlalchemy import func, select, text
@@ -14,6 +15,24 @@ from rpf.db.models import Photo, PhotoBib
 def get_by_sha256(db: Session, event_id: uuid.UUID, sha256: str) -> Photo | None:
     stmt = select(Photo).where(Photo.event_id == event_id, Photo.sha256 == sha256)
     return db.execute(stmt).scalar_one_or_none()
+
+
+def get_in_event(db: Session, event_id: uuid.UUID, photo_id: uuid.UUID) -> Photo | None:
+    """Fetch one photo, scoped to its event so ids cannot be used across events."""
+    stmt = select(Photo).where(Photo.event_id == event_id, Photo.id == photo_id)
+    return db.execute(stmt).scalar_one_or_none()
+
+
+def list_by_ids(db: Session, event_id: uuid.UUID, photo_ids: Sequence[uuid.UUID]) -> list[Photo]:
+    """Fetch several photos of one event. Ids that do not match are absent.
+
+    The `event_id` filter belongs in the query, not in a comprehension over the
+    result: it is what stops an id from another event being resolved at all.
+    """
+    if not photo_ids:
+        return []
+    stmt = select(Photo).where(Photo.event_id == event_id, Photo.id.in_(photo_ids))
+    return list(db.execute(stmt).scalars())
 
 
 def existing_sha256s(db: Session, event_id: uuid.UUID) -> set[str]:
