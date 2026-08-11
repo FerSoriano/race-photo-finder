@@ -52,17 +52,35 @@ Frontend. See `CLAUDE.md` for the rule that keeps this current.
 
 ### Done
 
-- Nothing yet — `frontend/` has a README only, no code (per root
-  `CLAUDE.md`, deliberately).
+- Stack chosen: React + Vite + TypeScript, Tailwind + shadcn/ui,
+  react-router, TanStack Query. Reasoning in `frontend/README.md`.
+- MVP built and verified end-to-end against the local backend
+  (`samples/photos` seeded as `test-event`):
+  - `EventsListPage` (`/`) — published events.
+  - `EventDetailPage` (`/eventos/:slug`) — bib search, results split into
+    "Tus fotos" (exact matches) and "¿Eres tú?" (possible matches: one
+    search per `similar_bib`, rendered as real thumbnails, tapping one
+    promotes it to the active search).
+  - Multi-select across both sections, sticky selection bar, bulk download
+    via `POST /v1/events/{slug}/photos/download`.
+  - Photo preview dialog showing the watermarked `preview_url`.
 
 ### Pending
 
-- Choose the frontend stack.
+- **Visual design needs a real pass.** Currently running on shadcn/ui
+  defaults with a single placeholder accent color — functional but generic,
+  no identity. Needs actual design work (color, type, personality) before
+  this is presentable to runners.
+- **Selection UX: add a "cart" strip.** Right now the sticky bar only shows
+  a count ("3 fotos seleccionadas"). Add a row of small thumbnails of the
+  currently-selected photos (below the search results or in the sticky
+  bar itself) so the runner can see at a glance which photos they've
+  picked, not just how many.
+- **"Deselect all" button, with a confirmation popup.** Add a way to clear
+  the whole selection at once instead of unchecking photos one by one --
+  guard it with a confirmation dialog so it isn't an accidental one-tap
+  wipe of everything picked.
 
 ### Future phases
 
-- Event search, bib search UI, photo gallery with multi-select, download
-  flow. The multi-select download has an API to call now: POST the selected
-  photo ids and trigger the returned signed URLs client-side (browsers prompt
-  once to allow multiple downloads).
 - Payment UI once a provider is chosen (see Backend future phases).

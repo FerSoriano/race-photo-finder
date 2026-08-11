@@ -1,4 +1,4 @@
-.PHONY: help setup up down dev api test test-all lint fmt migrate migration detect upload clean
+.PHONY: help setup up down dev api front front-setup dev-all test test-all lint fmt migrate migration detect upload clean
 
 BACKEND := backend
 UV := uv --project $(BACKEND)
@@ -24,6 +24,18 @@ dev: setup up migrate api ## Full local startup: deps, containers, migrations, A
 
 api: ## Run the API with reload
 	$(UV) run uvicorn rpf.main:app --reload --host 0.0.0.0 --port 8000
+
+front-setup: ## Install frontend dependencies and create frontend/.env if missing
+	cd frontend && npm install
+	@test -f frontend/.env || (cp frontend/.env.example frontend/.env && echo "Created frontend/.env from frontend/.env.example")
+
+front: ## Run the frontend dev server
+	cd frontend && npm run dev
+
+dev-all: setup up migrate front-setup ## Backend + frontend together in one terminal (Ctrl+C stops both)
+	@trap 'kill 0' EXIT INT TERM; \
+	($(UV) run uvicorn rpf.main:app --reload --host 0.0.0.0 --port 8000) & \
+	(cd frontend && npm run dev)
 
 # These cd into backend/ so pytest and ruff pick up backend/pyproject.toml.
 # Run from the repo root and its [tool.pytest.ini_options] is silently ignored,
