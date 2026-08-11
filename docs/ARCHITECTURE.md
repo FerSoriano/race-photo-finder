@@ -40,8 +40,10 @@ means. Details and enforcement: `backend/CLAUDE.md`.
 Cloudflare R2 grants public access **per bucket** -- attaching a custom domain
 publishes everything inside it, with no per-prefix control. Since the paid
 download model depends on originals being unreachable, they need their own
-bucket. `GET /v1/events/{slug}/photos/{id}/download` is the only door, and the
-only place a future payment check has to go.
+bucket. Two routes open that door -- one photo, or a selected batch -- but both
+end in `services/download.py:link_for`, which is the only code that mints a
+signed URL for an original and therefore the only place a future payment check
+has to go.
 
 R2 was chosen because egress is free. A runner downloading 6 MB photos costs
 nothing, which is what makes the free launch phase affordable.
@@ -109,6 +111,8 @@ GET  /v1/events                                 published events
 GET  /v1/events/{slug}                          event + photo count
 GET  /v1/events/{slug}/photos?bib=19131         the core search
 GET  /v1/events/{slug}/photos/{id}/download     302 to a signed original
+POST /v1/events/{slug}/photos/download          signed originals for a selection
+                                                (<= MAX_BULK_DOWNLOAD, default 10)
 
 POST /v1/admin/events                           X-Admin-Key
 GET  /v1/admin/events/{slug}/photos/hashes      X-Admin-Key (upload skip list)

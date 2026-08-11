@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import uuid
 
 import pytest
 from fastapi.testclient import TestClient
@@ -29,6 +30,9 @@ def client(tmp_path, monkeypatch):
         admin_api_key=ADMIN_KEY,
         storage_backend="local",
         local_storage_root=tmp_path,
+        # Pinned rather than inherited: a developer's .env must not decide
+        # whether the bulk-download cap test passes.
+        max_bulk_download=10,
     )
     try:
         with get_engine().connect() as conn:
@@ -187,4 +191,94 @@ class TestDownload:
     def test_photo_from_another_event_is_not_reachable(self, client, admin, event):
         missing = "00000000-0000-0000-0000-000000000000"
         response = client.get(f"/v1/events/{SLUG}/photos/{missing}/download")
+        assert response.status_code == 404
+
+
+class TestBulkDownload:
+    """One call for the whole gallery selection -- see services/download.py."""
+
+    def _ids(self, client, admin, jpeg_bytes, count):
+        # Distinct bytes per photo: ingest is idempotent by sha256, so identical
+        # files would collapse into one row.
+        ids = []
+        for index in range(count):
+            content = jpeg_bytes + bytes([index])
+            ids.append(_upload(client, admin, content, ["19131"], f"p{index}.jpg").json()["id"])
+        return ids
+
+    def test_links_come_back_in_the_order_they_were_asked_for(
+        self, client, admin, event, jpeg_bytes
+    ):
+        ids = self._ids(client, admin, jpeg_bytes, 3)
+        selection = [ids[2], ids[0], ids[1]]
+
+        body = client.post(
+            f"/v1/events/{SLUG}/photos/download", json={"photo_ids": selection}
+        ).json()
+
+        assert [p["id"] for p in body["photos"]] == selection
+        assert body["event_slug"] == SLUG
+        assert body["expires_in"] > 0
+
+    def test_each_link_carries_the_uploaded_filename(self, client, admin, event, jpeg_bytes):
+        """A runner must not end up with ten UUID-named files."""
+        ids = self._ids(client, admin, jpeg_bytes, 2)
+        body = client.post(f"/v1/events/{SLUG}/photos/download", json={"photo_ids": ids}).json()
+        assert [p["filename"] for p in body["photos"]] == ["p0.jpg", "p1.jpg"]
+
+    def test_links_point_at_originals_only(self, client, admin, event, jpeg_bytes):
+        ids = self._ids(client, admin, jpeg_bytes, 1)
+        body = client.post(f"/v1/events/{SLUG}/photos/download", json={"photo_ids": ids}).text
+        assert "/thumb/" not in body
+        assert "/preview/" not in body
+        assert "storage_key_original" not in body
+
+    def test_duplicates_collapse_to_one_link(self, client, admin, event, jpeg_bytes):
+        ids = self._ids(client, admin, jpeg_bytes, 1)
+        body = client.post(f"/v1/events/{SLUG}/photos/download", json={"photo_ids": ids * 3}).json()
+        assert len(body["photos"]) == 1
+
+    def test_over_the_cap_is_rejected(self, client, admin, event, jpeg_bytes):
+        too_many = [str(uuid.uuid4()) for _ in range(11)]
+        response = client.post(f"/v1/events/{SLUG}/photos/download", json={"photo_ids": too_many})
+        assert response.status_code == 422
+        # Rejected on the count alone -- no lookup of ids we will not serve.
+        assert "limit is 10" in response.json()["detail"]
+
+    def test_an_empty_selection_is_rejected(self, client, admin, event):
+        response = client.post(f"/v1/events/{SLUG}/photos/download", json={"photo_ids": []})
+        assert response.status_code == 422
+
+    def test_one_unknown_id_fails_the_whole_request(self, client, admin, event, jpeg_bytes):
+        """A stale selection should say so, not quietly come up short."""
+        ids = self._ids(client, admin, jpeg_bytes, 1)
+        missing = str(uuid.uuid4())
+        response = client.post(
+            f"/v1/events/{SLUG}/photos/download", json={"photo_ids": [*ids, missing]}
+        )
+        assert response.status_code == 404
+        assert missing in response.json()["detail"]
+
+    def test_a_photo_of_another_event_is_not_reachable(self, client, admin, event, jpeg_bytes):
+        """Ids are resolved scoped to the event, so borrowing one fails."""
+        ids = self._ids(client, admin, jpeg_bytes, 1)
+        client.post(
+            "/v1/admin/events",
+            headers=admin,
+            json={"slug": "itest-other", "name": "Other", "is_published": True},
+        )
+        try:
+            response = client.post(
+                "/v1/events/itest-other/photos/download", json={"photo_ids": ids}
+            )
+            assert response.status_code == 404
+        finally:
+            with get_session_factory()() as db:
+                db.execute(text("DELETE FROM events WHERE slug = 'itest-other'"))
+                db.commit()
+
+    def test_an_unknown_event_is_a_404(self, client):
+        response = client.post(
+            "/v1/events/itest-nope/photos/download", json={"photo_ids": [str(uuid.uuid4())]}
+        )
         assert response.status_code == 404

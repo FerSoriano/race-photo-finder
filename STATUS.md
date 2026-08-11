@@ -1,6 +1,6 @@
 # Project status
 
-Last updated: 2026-08-09
+Last updated: 2026-08-10
 
 Tracks what's done, what's pending, and future phases. Split into Backend and
 Frontend. See `CLAUDE.md` for the rule that keeps this current.
@@ -21,6 +21,11 @@ Frontend. See `CLAUDE.md` for the rule that keeps this current.
   private-originals / public-derivatives split enforced.
 - Bib search: exact match via indexed seek (0.165 ms measured), trigram
   similarity fallback for near-misses (misread digits).
+- Downloads: one signed URL per photo, plus
+  `POST /v1/events/{slug}/photos/download` for a gallery selection (capped by
+  `MAX_BULK_DOWNLOAD`, default 10). Both go through
+  `services/download.py:link_for` — the one place the payment check will go.
+  Signed URLs carry the original filename, so a batch does not land as UUIDs.
 - Dev stack: Postgres (host port 5433) + MinIO via `make up` / `migrate` /
   `api`.
 - Unit + integration test suite (config, derivatives, manifest, normalize,
@@ -57,5 +62,7 @@ Frontend. See `CLAUDE.md` for the rule that keeps this current.
 ### Future phases
 
 - Event search, bib search UI, photo gallery with multi-select, download
-  flow.
+  flow. The multi-select download has an API to call now: POST the selected
+  photo ids and trigger the returned signed URLs client-side (browsers prompt
+  once to allow multiple downloads).
 - Payment UI once a provider is chosen (see Backend future phases).
