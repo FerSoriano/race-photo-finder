@@ -24,6 +24,7 @@ class EventRead(BaseModel):
     event_date: date | None
     location: str | None
     description: str | None
+    cover_url: str | None = None
     is_published: bool
 
 

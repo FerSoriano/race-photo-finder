@@ -17,6 +17,7 @@ from rpf.repositories import events as event_repo
 from rpf.repositories import photos as photo_repo
 from rpf.schemas.events import EventCreate, EventRead
 from rpf.schemas.photos import BibIngest, PhotoIngestResult
+from rpf.services import cover as cover_service
 from rpf.services import ingest as ingest_service
 
 router = APIRouter(prefix="/v1/admin", tags=["admin"], dependencies=[AdminGuard])
@@ -33,6 +34,29 @@ def create_event(payload: EventCreate, db: DbSession) -> EventRead:
         )
     event = event_repo.create(db, **payload.model_dump())
     return EventRead.model_validate(event)
+
+
+@router.post("/events/{slug}/cover", response_model=EventRead)
+async def upload_cover(
+    event: AnyEvent,
+    db: DbSession,
+    storage: Storage,
+    file: UploadFile = File(...),
+) -> EventRead:
+    content = await file.read()
+    try:
+        updated = cover_service.upload_cover(db, event=event, content=content, storage=storage)
+    except cover_service.InvalidCoverImageError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+    return EventRead.model_validate(updated)
+
+
+@router.delete("/events/{slug}/cover", response_model=EventRead)
+def delete_cover(event: AnyEvent, db: DbSession, storage: Storage) -> EventRead:
+    updated = cover_service.delete_cover(db, event=event, storage=storage)
+    return EventRead.model_validate(updated)
 
 
 @router.get("/events/{slug}/photos/hashes", response_model=list[str])

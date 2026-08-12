@@ -21,6 +21,10 @@ def build_key(event_slug: str, derivative: Derivative, photo_id: str, ext: str =
     return f"events/{event_slug}/{derivative}/{photo_id}.{ext}"
 
 
+def build_cover_key(event_slug: str, ext: str) -> str:
+    return f"events/{event_slug}/cover.{ext}"
+
+
 @runtime_checkable
 class StorageBackend(Protocol):
     """Minimal object-storage surface the application depends on."""

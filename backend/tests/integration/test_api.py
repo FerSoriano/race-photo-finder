@@ -6,11 +6,13 @@ make up && make migrate && uv --project backend run pytest -m integration
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import uuid
 
 import pytest
 from fastapi.testclient import TestClient
+from PIL import Image
 from sqlalchemy import text
 
 from rpf.config import Settings
@@ -192,6 +194,87 @@ class TestDownload:
         missing = "00000000-0000-0000-0000-000000000000"
         response = client.get(f"/v1/events/{SLUG}/photos/{missing}/download")
         assert response.status_code == 404
+
+
+class TestCover:
+    """The admin-only cover image endpoints -- see services/cover.py."""
+
+    def test_upload_sets_cover_url(self, client, admin, event, jpeg_bytes):
+        response = client.post(
+            f"/v1/admin/events/{SLUG}/cover",
+            headers=admin,
+            files={"file": ("cover.jpg", jpeg_bytes, "image/jpeg")},
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body["cover_url"] is not None
+        assert f"events/{SLUG}/cover.jpg" in body["cover_url"]
+
+        # The public read paths (list + detail) pick it up too.
+        detail = client.get(f"/v1/events/{SLUG}").json()
+        assert detail["cover_url"] == body["cover_url"]
+
+    def test_upload_requires_admin_key(self, client, event, jpeg_bytes):
+        response = client.post(
+            f"/v1/admin/events/{SLUG}/cover",
+            files={"file": ("cover.jpg", jpeg_bytes, "image/jpeg")},
+        )
+        assert response.status_code == 401
+
+    def test_upload_rejects_a_non_image_file(self, client, admin, event):
+        response = client.post(
+            f"/v1/admin/events/{SLUG}/cover",
+            headers=admin,
+            files={"file": ("cover.txt", b"not an image", "text/plain")},
+        )
+        assert response.status_code == 422
+        assert "not a valid image" in response.json()["detail"]
+
+    def test_upload_rejects_a_file_over_the_size_cap(self, client, admin, event):
+        oversized = b"0" * (5 * 1024 * 1024 + 1)
+        response = client.post(
+            f"/v1/admin/events/{SLUG}/cover",
+            headers=admin,
+            files={"file": ("cover.jpg", oversized, "image/jpeg")},
+        )
+        assert response.status_code == 422
+        assert "limit is" in response.json()["detail"]
+
+    def test_delete_clears_the_cover_url(self, client, admin, event, jpeg_bytes):
+        client.post(
+            f"/v1/admin/events/{SLUG}/cover",
+            headers=admin,
+            files={"file": ("cover.jpg", jpeg_bytes, "image/jpeg")},
+        )
+        response = client.delete(f"/v1/admin/events/{SLUG}/cover", headers=admin)
+        assert response.status_code == 200
+        assert response.json()["cover_url"] is None
+
+        detail = client.get(f"/v1/events/{SLUG}").json()
+        assert detail["cover_url"] is None
+
+    def test_delete_requires_admin_key(self, client, event):
+        response = client.delete(f"/v1/admin/events/{SLUG}/cover")
+        assert response.status_code == 401
+
+    def test_reupload_in_a_different_format_replaces_the_old_key(
+        self, client, admin, event, jpeg_bytes
+    ):
+        png_buffer = io.BytesIO()
+        Image.new("RGB", (100, 100), (10, 20, 30)).save(png_buffer, format="PNG")
+
+        client.post(
+            f"/v1/admin/events/{SLUG}/cover",
+            headers=admin,
+            files={"file": ("cover.jpg", jpeg_bytes, "image/jpeg")},
+        )
+        response = client.post(
+            f"/v1/admin/events/{SLUG}/cover",
+            headers=admin,
+            files={"file": ("cover.png", png_buffer.getvalue(), "image/png")},
+        )
+        assert response.status_code == 200
+        assert f"events/{SLUG}/cover.png" in response.json()["cover_url"]
 
 
 class TestBulkDownload:
