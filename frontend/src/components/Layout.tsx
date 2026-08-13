@@ -41,8 +41,9 @@ export function Layout() {
   )
 }
 
-/** The signature bib, shrunk to a logo. */
-function BibMark() {
+/** The signature bib, shrunk to a logo. Exported so the admin shell can reuse
+ * the same wordmark instead of duplicating it. */
+export function BibMark() {
   return (
     <span className="relative grid h-[22px] w-[30px] flex-none place-items-center rounded-[3px] bg-dorsal text-dorsal-ink">
       <span className="bib-pin absolute top-[3px] left-[3px] size-[2.5px]" />
