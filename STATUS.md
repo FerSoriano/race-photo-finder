@@ -54,6 +54,12 @@ Frontend. See `CLAUDE.md` for the rule that keeps this current.
 - ~~C/C++-accelerated search algorithm~~ — resolved: not needed. The
   Postgres indexed seek already measures 0.165 ms; see `CLAUDE.md`
   "Non-obvious facts".
+- Event list ordering and search on `GET /v1/events`: `event_date DESC`
+  ordering, `limit`/`offset`, and a `?q=` filter over name and location.
+  The ordering is the backend's job by decision — the client must not sort.
+  `?q=` is only needed once the catalogue passes ~200 events; below that the
+  frontend filters what it already has. Drives the Frontend → Future phases
+  item on event search and pagination.
 
 ## Frontend
 
@@ -71,23 +77,76 @@ Frontend. See `CLAUDE.md` for the rule that keeps this current.
   - Multi-select across both sections, sticky selection bar, bulk download
     via `POST /v1/events/{slug}/photos/download`.
   - Photo preview dialog showing the watermarked `preview_url`.
+- **Visual design pass — "Volt sobre asfalto".** The placeholder hue-35
+  accent is gone; the app has an identity. Verified in the browser.
+  - Palette: near-black ground (`asfalto`) with a single high-energy lime
+    accent (`volt`) spent once per screen, plus amber (`warning`) for the
+    detector's uncertain reads. Amber deliberately, never red — a near-miss
+    is a recovery path, not an error. `accent` stays a neutral surface
+    because shadcn uses it for every hover.
+  - **Dark-only, by decision.** The light token block, `.dark` and
+    `@custom-variant dark` were deleted rather than left as dead code. The
+    dark ground is what makes the photos pop; there is no toggle and no
+    place for one. Revisit that decision before reintroducing a second theme.
+  - Type: Geist for body, **Archivo** for `--font-heading` (which was a
+    no-op pointing at `--font-sans`), plus `tabular-nums` wherever digits
+    carry meaning.
+  - Signature element — **El Dorsal**: the bib search is not an input styled
+    like a race bib, it is the bib. The same motif runs at three scales:
+    the hero (`Bib`), the number badge on each photo (`BibBadge`), the
+    header mark, and every empty state (`EmptyBib`).
+- Layout shell (`Layout`) with a sticky header and a way back to the event
+  list, a real 404 route, and OG/description/theme-color metadata so
+  WhatsApp links render a preview card. `og:image` is a generated 1200×630
+  `public/og.png`.
+- `EventsListPage`: cards with cover art, loading skeletons matching the card
+  shape, and designed empty/error states. Cover art uses `cover_url` when
+  present and falls back to a gradient derived from the slug — also on image
+  load failure — so an event without a photo still looks deliberate.
+- `EventDetailPage`: hero-first layout with the bib search above the fold
+  over the event cover, photo grid respecting real aspect ratios via
+  `PhotoRead.width`/`height` (the old `aspect-square` cropped every portrait),
+  `is_uncertain` surfaced on the tile, and grid skeletons.
+- `PossibleMatches` redesigned as a recovery path: a real, prominent
+  "Sí, soy el {bib}" button instead of an underlined text link.
+- `SelectionBar`: thumbnail strip of the selected photos with per-photo
+  removal, a `3 / 10` cap indicator that warns before the server rejects,
+  "Quitar todo" behind an `alert-dialog`, and a toast confirming a download
+  fired. Selection is keyed by photo id in a `Map` holding the whole photo,
+  because a selected photo can come from a "¿Eres tú?" section the page
+  never fetched itself.
+- Scaffold residue removed: `vite-scaffold` title, shadcn favicon,
+  `icons.svg`, and the `badge`/`card`/`input` primitives left unused by the
+  redesign. `SearchBox` was superseded by `Bib`.
 
 ### Pending
 
-- **Visual design needs a real pass.** Currently running on shadcn/ui
-  defaults with a single placeholder accent color — functional but generic,
-  no identity. Needs actual design work (color, type, personality) before
-  this is presentable to runners.
-- **Selection UX: add a "cart" strip.** Right now the sticky bar only shows
-  a count ("3 fotos seleccionadas"). Add a row of small thumbnails of the
-  currently-selected photos (below the search results or in the sticky
-  bar itself) so the runner can see at a glance which photos they've
-  picked, not just how many.
-- **"Deselect all" button, with a confirmation popup.** Add a way to clear
-  the whole selection at once instead of unchecking photos one by one --
-  guard it with a confirmation dialog so it isn't an accidental one-tap
-  wipe of everything picked.
+- **`VITE_SITE_URL` must be set at deploy time.** It builds the absolute
+  `og:image` URL in `index.html`; WhatsApp will not render a preview card
+  from a relative one. Falls back to the dev-server origin when unset.
+- **Pagination is still unused.** `searchPhotos` accepts `limit`/`offset`
+  and the client never sends them, so a bib with many photos renders all at
+  once.
+- **Selection is lost on reload** — it lives in page state, not the URL.
 
 ### Future phases
 
 - Payment UI once a provider is chosen (see Backend future phases).
+- **Background pattern on the hero.** A dot pattern behind the hero/header,
+  pure CSS via `radial-gradient` — no external library, this is native CSS.
+  Scope it to the hero only, never the whole page: the photo grid is the
+  content, and a full-page texture would compete with it.
+- **Event search and pagination on `EventsListPage`.** Today only a single
+  test event is listed. Events must render newest-first, and once the
+  catalogue grows (target: 100+ events) the home page should show only the
+  latest 10 plus a search input filtering by name, city or date.
+  - Filtering can stay client-side while the total is under ~200; past that
+    it moves to the backend behind `?q=`.
+  - **Date DESC ordering must come from the backend, not from sorting in the
+    client.** Needs the `GET /v1/events` change tracked in Backend →
+    Future phases.
+- **Global footer in the layout shell.** Sections: "Quiénes somos"
+  (`/about`), social links (Instagram, Facebook, TikTok), privacy notice and
+  terms of use (`/privacidad`, `/terminos`), and copyright. This phase only
+  wires the links — the static pages themselves are not built yet. Keep the
+  styling discreet so it does not compete with the main content.
