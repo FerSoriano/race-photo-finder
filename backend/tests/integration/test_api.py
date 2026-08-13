@@ -122,6 +122,63 @@ class TestEvents:
                 db.execute(text("DELETE FROM events WHERE slug = 'itest-hidden'"))
                 db.commit()
 
+    def test_publish_makes_it_visible(self, client, admin):
+        client.post(
+            "/v1/admin/events",
+            headers=admin,
+            json={"slug": "itest-publish", "name": "Draft"},
+        )
+        try:
+            assert client.get("/v1/events/itest-publish").status_code == 404
+
+            response = client.patch(
+                "/v1/admin/events/itest-publish", headers=admin, json={"is_published": True}
+            )
+            assert response.status_code == 200
+            assert response.json()["is_published"] is True
+            assert client.get("/v1/events/itest-publish").status_code == 200
+        finally:
+            with get_session_factory()() as db:
+                db.execute(text("DELETE FROM events WHERE slug = 'itest-publish'"))
+                db.commit()
+
+    def test_unpublish_hides_it_again_without_deleting_it(self, client, admin, event, jpeg_bytes):
+        _upload(client, admin, jpeg_bytes, ["19131"])
+
+        response = client.patch(
+            f"/v1/admin/events/{SLUG}", headers=admin, json={"is_published": False}
+        )
+        assert response.status_code == 200
+        assert response.json()["is_published"] is False
+        assert client.get(f"/v1/events/{SLUG}").status_code == 404
+
+        # The row itself is untouched -- only public visibility changed. The
+        # public search 404s along with the event (it also requires
+        # PublishedEvent), so check via the admin-only hashes endpoint instead.
+        hashes = client.get(f"/v1/admin/events/{SLUG}/photos/hashes", headers=admin).json()
+        assert len(hashes) == 1
+        assert client.get(f"/v1/events/{SLUG}/photos", params={"bib": "19131"}).status_code == 404
+
+    def test_update_only_touches_fields_that_were_sent(self, client, admin, event):
+        response = client.patch(
+            f"/v1/admin/events/{SLUG}", headers=admin, json={"location": "Guadalajara"}
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body["location"] == "Guadalajara"
+        assert body["name"] == "Integration Race"
+        assert body["is_published"] is True
+
+    def test_update_requires_admin_key(self, client, event):
+        response = client.patch(f"/v1/admin/events/{SLUG}", json={"is_published": True})
+        assert response.status_code == 401
+
+    def test_update_unknown_event_is_a_404(self, client, admin):
+        response = client.patch(
+            "/v1/admin/events/itest-nope", headers=admin, json={"is_published": True}
+        )
+        assert response.status_code == 404
+
 
 class TestIngest:
     def test_upload_then_search(self, client, admin, event, jpeg_bytes):

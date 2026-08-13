@@ -15,7 +15,7 @@ from pydantic import TypeAdapter, ValidationError
 from rpf.api.deps import AdminGuard, AnyEvent, AppSettings, DbSession, Storage
 from rpf.repositories import events as event_repo
 from rpf.repositories import photos as photo_repo
-from rpf.schemas.events import EventCreate, EventRead
+from rpf.schemas.events import EventCreate, EventRead, EventUpdate
 from rpf.schemas.photos import BibIngest, PhotoIngestResult
 from rpf.services import cover as cover_service
 from rpf.services import ingest as ingest_service
@@ -34,6 +34,12 @@ def create_event(payload: EventCreate, db: DbSession) -> EventRead:
         )
     event = event_repo.create(db, **payload.model_dump())
     return EventRead.model_validate(event)
+
+
+@router.patch("/events/{slug}", response_model=EventRead)
+def update_event(event: AnyEvent, payload: EventUpdate, db: DbSession) -> EventRead:
+    updated = event_repo.update(db, event, **payload.model_dump(exclude_unset=True))
+    return EventRead.model_validate(updated)
 
 
 @router.post("/events/{slug}/cover", response_model=EventRead)

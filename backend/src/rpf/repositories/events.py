@@ -53,6 +53,15 @@ def create(
     return event
 
 
+def update(db: Session, event: Event, **fields: object) -> Event:
+    """Sets only the fields passed in -- callers filter with `exclude_unset`,
+    so a field left out of the request is left untouched, not reset to None."""
+    for key, value in fields.items():
+        setattr(event, key, value)
+    db.flush()
+    return event
+
+
 def set_cover_url(db: Session, event: Event, cover_url: str | None) -> Event:
     event.cover_url = cover_url
     db.flush()
