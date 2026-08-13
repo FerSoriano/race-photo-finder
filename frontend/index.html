@@ -1,10 +1,36 @@
 <!doctype html>
-<html lang="en">
+<html lang="es">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>vite-scaffold</title>
+
+    <title>Fotos de carrera — Encuentra tus fotos con tu número</title>
+    <meta
+      name="description"
+      content="Escribe tu número de corredor y encuentra tus fotos de la carrera. Sin registro."
+    />
+
+    <!-- The app is dark-only; declaring it keeps the browser (and WhatsApp's
+         in-app webview) from flashing a white ground before the first paint. -->
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0f1214" />
+
+    <!-- Every visit arrives from a link pasted into a WhatsApp group, so the
+         preview card is the product's real front door. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Fotos de carrera" />
+    <meta property="og:locale" content="es_MX" />
+    <meta property="og:title" content="Encuentra tus fotos de carrera" />
+    <meta
+      property="og:description"
+      content="Escribe tu número de corredor y encuentra tus fotos. Sin registro."
+    />
+    <meta property="og:image" content="%SITE_URL%/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Un dorsal de carrera con el número 19131" />
+    <meta name="twitter:card" content="summary_large_image" />
   </head>
   <body>
     <div id="root"></div>

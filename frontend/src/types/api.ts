@@ -5,6 +5,7 @@ export interface EventRead {
   event_date: string | null
   location: string | null
   description: string | null
+  cover_url: string | null
   is_published: boolean
 }
 
