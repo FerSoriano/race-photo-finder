@@ -129,6 +129,12 @@ Frontend. See `CLAUDE.md` for the rule that keeps this current.
 
 ### Pending
 
+- **Site name: `fotometa.run`.** Decided. Rename touches:
+  `public/og.png` (regenerate — bib badge text "FOTOS DE CARRERA" →
+  "FotoMeta.Run", bib number `21` → `22`), `index.html` (`<title>`,
+  `og:site_name`, `og:title`), and `Layout.tsx`'s header wordmark
+  ("Fotos de carrera" → "FotoMeta.Run"). `VITE_SITE_URL` below should end up
+  pointing at `https://fotometa.run` once deployed.
 - **`VITE_SITE_URL` must be set at deploy time.** It builds the absolute
   `og:image` URL in `index.html`; WhatsApp will not render a preview card
   from a relative one. Falls back to the dev-server origin when unset.
