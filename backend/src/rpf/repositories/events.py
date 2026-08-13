@@ -51,3 +51,9 @@ def create(
     db.add(event)
     db.flush()
     return event
+
+
+def set_cover_url(db: Session, event: Event, cover_url: str | None) -> Event:
+    event.cover_url = cover_url
+    db.flush()
+    return event

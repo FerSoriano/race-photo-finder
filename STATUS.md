@@ -1,6 +1,6 @@
 # Project status
 
-Last updated: 2026-08-10
+Last updated: 2026-08-12
 
 Tracks what's done, what's pending, and future phases. Split into Backend and
 Frontend. See `CLAUDE.md` for the rule that keeps this current.
@@ -26,6 +26,13 @@ Frontend. See `CLAUDE.md` for the rule that keeps this current.
   `MAX_BULK_DOWNLOAD`, default 10). Both go through
   `services/download.py:link_for` — the one place the payment check will go.
   Signed URLs carry the original filename, so a batch does not land as UUIDs.
+- Event cover images: optional `events.cover_url`, uploaded via
+  `POST /v1/admin/events/{slug}/cover` and cleared via
+  `DELETE /v1/admin/events/{slug}/cover` (admin/CLI only, no UI yet). Validated
+  against the decoded image (jpg/png/webp, 5MB cap) rather than the declared
+  content-type, stored in the public bucket at `events/{slug}/cover.{ext}`.
+  `EventRead.cover_url` is `None` when unset, so the frontend's gradient
+  placeholder stays the fallback.
 - Dev stack: Postgres (host port 5433) + MinIO via `make up` / `migrate` /
   `api`.
 - Unit + integration test suite (config, derivatives, manifest, normalize,

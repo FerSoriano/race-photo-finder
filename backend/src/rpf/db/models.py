@@ -45,6 +45,9 @@ class Event(Base):
     event_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     location: Mapped[str | None] = mapped_column(String(200), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Public URL of the cover image, or None to fall back to the frontend's
+    # slug-derived gradient placeholder.
+    cover_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Unpublished events are invisible to the public API but can be ingested
     # into, so photos can be uploaded before the announcement goes out.
     is_published: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
