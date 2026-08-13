@@ -1,6 +1,6 @@
 # Project status
 
-Last updated: 2026-08-12 (evening)
+Last updated: 2026-08-13
 
 Tracks what's done, what's pending, and future phases. Split into Backend and
 Frontend. See `CLAUDE.md` for the rule that keeps this current.
@@ -28,11 +28,23 @@ Frontend. See `CLAUDE.md` for the rule that keeps this current.
   Signed URLs carry the original filename, so a batch does not land as UUIDs.
 - Event cover images: optional `events.cover_url`, uploaded via
   `POST /v1/admin/events/{slug}/cover` and cleared via
-  `DELETE /v1/admin/events/{slug}/cover` (admin/CLI only, no UI yet). Validated
-  against the decoded image (jpg/png/webp, 5MB cap) rather than the declared
-  content-type, stored in the public bucket at `events/{slug}/cover.{ext}`.
-  `EventRead.cover_url` is `None` when unset, so the frontend's gradient
-  placeholder stays the fallback.
+  `DELETE /v1/admin/events/{slug}/cover`. Validated against the decoded image
+  (jpg/png/webp, 5MB cap) rather than the declared content-type, stored in the
+  public bucket at `events/{slug}/cover.{ext}`. `EventRead.cover_url` is
+  `None` when unset, so the frontend's gradient placeholder stays the
+  fallback. Has a UI now — see Frontend → Done, admin panel.
+- Admin API rounded out for the `/admin` panel: `GET /v1/admin/stats`
+  (dashboard counts), `GET /v1/admin/events` and `GET /v1/admin/events/{slug}`
+  (reach drafts, unlike the public routes), and `DELETE /v1/admin/events/{slug}`.
+  Delete sweeps every photo's three derivatives plus the cover from object
+  storage *before* removing the DB row (`services/events.py::delete_event`) —
+  storage-first so a failed sweep leaves a retryable event instead of a live
+  event with dead thumbnails. Needed a new `StorageBackend.delete_many`
+  (batched at 1000 keys on S3/R2, looped on local) since a several-thousand-
+  photo event is thousands of objects. `create_event`/`update_event` moved
+  off the routes-call-repositories-directly shortcut and into
+  `services/events.py`, matching the layering rule. CORS now allows
+  `PATCH`/`DELETE` — the browser preflight the CLI never triggered.
 - Event publishing: `PATCH /v1/admin/events/{slug}` (partial update — a field
   left out of the request is untouched, `EventUpdate.model_dump(exclude_unset=True)`)
   and `rpf publish --event <slug>` / `--undo` on top of it. Closes the gap
@@ -49,6 +61,12 @@ Frontend. See `CLAUDE.md` for the rule that keeps this current.
 
 ### Pending
 
+- **No command for the event cover.** `POST /v1/admin/events/{slug}/cover` has
+  no CLI in front of it, so setting a cover means writing `curl` by hand — the
+  only step of the runbook that does. Needs an `rpf cover` command (upload,
+  plus `--undo` for the `DELETE`, mirroring `rpf publish`'s shape) and a
+  `make cover F=<file> E=<event-slug>` target next to `detect` / `upload`.
+  Add the step to `docs/WORKFLOW.md` once it exists.
 - Production deploy configuration (R2 credentials, hosting, etc.) not yet
   set up.
 
@@ -68,6 +86,23 @@ Frontend. See `CLAUDE.md` for the rule that keeps this current.
   `?q=` is only needed once the catalogue passes ~200 events; below that the
   frontend filters what it already has. Drives the Frontend → Future phases
   item on event search and pagination.
+- **IMPORTANT — download tracking, needed for the admin dashboard's
+  "descargas este mes" and for payment gating.** Neither exists today:
+  `services/download.py::link_for` mints a signed URL and forgets, the bytes
+  never touch the API, and there is no `downloads` table or counter. Building
+  this needs a new table + a reviewed-by-hand Alembic migration (see
+  `db-migration` skill), an insert inside `link_for` (which currently takes no
+  `Session` — its signature has to change), and a month-over-month query for
+  the dashboard. `link_for` is already documented as the single choke point
+  future payment gating goes through, so build both in the same pass rather
+  than touching that function twice.
+- Scoped admin session token. `/admin` now holds `X-Admin-Key` in the
+  browser's `localStorage` — the same long-lived secret `rpf upload` uses,
+  with full ingest and delete power, capped only by a 30-day client-side
+  expiry. A `POST /v1/admin/session` exchanging the key for a short-lived,
+  narrower token would keep the raw ingest secret off the browser entirely.
+  Not urgent while this is a single-operator tool, but worth doing before any
+  second admin exists.
 
 ## Frontend
 
@@ -125,7 +160,26 @@ Frontend. See `CLAUDE.md` for the rule that keeps this current.
   never fetched itself.
 - Scaffold residue removed: `vite-scaffold` title, shadcn favicon,
   `icons.svg`, and the `badge`/`card`/`input` primitives left unused by the
-  redesign. `SearchBox` was superseded by `Bib`.
+  redesign. `SearchBox` was superseded by `Bib`. (`badge`/`input` are back —
+  see the admin panel below; `card` stays out, hand-rolled where needed.)
+- **Admin panel (`/admin`), desktop-first, verified end-to-end in the browser
+  (Playwright).** A separate shell (`AdminLayout`) from the public app's
+  mobile-first `Layout` — `React.lazy()`-loaded from `App.tsx` so none of it
+  reaches a runner's bundle.
+  - Auth: paste-once `X-Admin-Key`, verified against `GET /v1/admin/stats`
+    before being written to `localStorage` (30-day expiry, "Cerrar sesión"
+    clears it). Never a `VITE_*` build-time var — that would ship the key to
+    every visitor. A 401 anywhere in the panel clears the stored key so the
+    paste screen reappears instead of every query failing silently.
+  - `/admin` — dashboard: total events split published/draft, total photos.
+  - `/admin/eventos` — table of every event including drafts, publish
+    toggle, create dialog (slug auto-derived from the name, editable once),
+    delete behind a type-the-slug confirmation.
+  - `/admin/eventos/:slug` — edit name/date/location/description (slug
+    rendered read-only — changing it would break shared links), drag-and-drop
+    cover upload (native drag events, no library), photo count, delete.
+  - Mass photo ingest is deliberately **not** here — see
+    `frontend/CLAUDE.md` → "The admin panel" for why.
 
 ### Pending
 

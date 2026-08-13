@@ -15,7 +15,7 @@ Free and unlimited at first; paid downloads come later.
 
 ```
 backend/     FastAPI API + `rpf` CLI. See backend/CLAUDE.md before editing.
-frontend/    Stack not chosen yet. README only -- do not add code.
+frontend/    React + Vite + TypeScript. See frontend/CLAUDE.md before editing.
 docs/        Architecture and data model.
 samples/     Four test photos with known bib numbers.
 .claude/     Skills and permissions.
