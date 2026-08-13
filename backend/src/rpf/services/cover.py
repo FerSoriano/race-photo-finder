@@ -1,9 +1,13 @@
 """Event cover images: an optional banner the frontend shows instead of its
 slug-derived gradient placeholder.
 
-Uploaded through the admin API only -- there is no UI for this yet. Covers
+Uploaded through the admin API, from the `/admin` panel or by hand. Covers
 live in the public bucket alongside thumbs and previews (unlike originals,
 they carry no payment concern, so a stable public URL is fine).
+
+`cover_key()` is exported for `services/events.py`, which needs it to sweep a
+cover object when an event is deleted -- `cover_url` is the only record of
+where that object lives.
 """
 
 from __future__ import annotations
@@ -55,7 +59,7 @@ def _validate(content: bytes) -> str:
     return fmt
 
 
-def _existing_key(event: Event) -> str | None:
+def cover_key(event: Event) -> str | None:
     if not event.cover_url:
         return None
     match = _COVER_KEY_RE.search(event.cover_url)
@@ -72,7 +76,7 @@ def upload_cover(
     fmt = _validate(content)
     ext = _EXTENSIONS[fmt]
     key = build_cover_key(event.slug, ext)
-    previous_key = _existing_key(event)
+    previous_key = cover_key(event)
 
     storage.put(key, io.BytesIO(content), content_type=_CONTENT_TYPES[fmt], visibility="public")
     # A re-upload in a different format leaves a stale key (cover.png ->
@@ -85,7 +89,7 @@ def upload_cover(
 
 
 def delete_cover(db: Session, *, event: Event, storage: StorageBackend) -> Event:
-    key = _existing_key(event)
+    key = cover_key(event)
     if key:
         storage.delete(key, visibility="public")
     return event_repo.set_cover_url(db, event, None)

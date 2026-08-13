@@ -8,6 +8,7 @@ for B2, S3 or plain disk by editing .env instead of code.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import BinaryIO, Literal, Protocol, runtime_checkable
 
 Visibility = Literal["public", "private"]
@@ -65,4 +66,16 @@ class StorageBackend(Protocol):
 
     def delete(self, key: str, visibility: Visibility = "private") -> None:
         """Remove the object. Deleting a missing key is not an error."""
+        ...
+
+    def delete_many(self, keys: Sequence[str], visibility: Visibility = "private") -> None:
+        """Remove many objects at once. Missing keys are not an error.
+
+        Deleting an event means removing three derivatives per photo, so a
+        large race is thousands of objects -- one round trip each would take
+        minutes. Deliberately keyed rather than prefixed: a `delete_prefix`
+        API invites "remove everything under events/{slug}/", which on a typo
+        is unbounded. Enumerating keys from the database means we can only
+        ever delete objects we recorded.
+        """
         ...

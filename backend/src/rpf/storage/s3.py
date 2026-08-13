@@ -13,6 +13,7 @@ Two R2 quirks are accounted for and are harmless elsewhere:
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, BinaryIO
 from urllib.parse import quote
 
@@ -29,6 +30,9 @@ if TYPE_CHECKING:
 # smuggle a second header past it. Filenames reach us from an upload, so they
 # are untrusted input on their way into a response header.
 _UNSAFE_IN_FILENAME = re.compile(r'[\\"\r\n\x00-\x1f\x7f/]')
+
+# The DeleteObjects API caps a single request at 1000 keys.
+_DELETE_BATCH = 1000
 
 
 def content_disposition(filename: str) -> str:
@@ -135,3 +139,23 @@ class S3Storage:
 
     def delete(self, key: str, visibility: Visibility = "private") -> None:
         self._client.delete_object(Bucket=self._bucket_for(visibility), Key=key)
+
+    def delete_many(self, keys: Sequence[str], visibility: Visibility = "private") -> None:
+        bucket = self._bucket_for(visibility)
+        # DeleteObjects caps a request at 1000 keys across S3, R2 and MinIO.
+        for start in range(0, len(keys), _DELETE_BATCH):
+            batch = keys[start : start + _DELETE_BATCH]
+            response = self._client.delete_objects(
+                Bucket=bucket,
+                Delete={"Objects": [{"Key": key} for key in batch], "Quiet": True},
+            )
+            # A missing key is reported as a success, so anything in Errors is
+            # a real failure -- permissions, throttling, a wrong bucket. Raise
+            # rather than leave the caller believing the sweep finished.
+            errors = response.get("Errors") or []
+            if errors:
+                first = errors[0]
+                raise OSError(
+                    f"Failed to delete {len(errors)} object(s) from {bucket}: "
+                    f"{first.get('Key')} -- {first.get('Code')} {first.get('Message')}"
+                )

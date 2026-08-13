@@ -19,12 +19,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         version="0.1.0",
     )
 
-    # The frontend stack is undecided, so dev is permissive; production must
-    # pin real origins before launch.
+    # Dev is permissive; production must pin real origins before launch.
+    # PATCH and DELETE are listed because the admin panel calls them from a
+    # browser, which sends a preflight the CLI never did.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"] if settings.environment != "prod" else [],
-        allow_methods=["GET", "POST"],
+        allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["*"],
     )
 

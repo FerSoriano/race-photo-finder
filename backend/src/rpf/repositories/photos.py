@@ -162,3 +162,30 @@ def search_similar_bibs(
 def count_by_event(db: Session, event_id: uuid.UUID) -> int:
     stmt = select(func.count()).select_from(Photo).where(Photo.event_id == event_id)
     return db.execute(stmt).scalar_one()
+
+
+def count_all(db: Session) -> int:
+    return db.execute(select(func.count()).select_from(Photo)).scalar_one()
+
+
+def counts_by_event(db: Session) -> dict[uuid.UUID, int]:
+    """One grouped query instead of one `count_by_event` call per event.
+
+    Events with zero photos are absent from the result -- callers must use
+    `.get(event_id, 0)`, not index into this dict directly.
+    """
+    stmt = select(Photo.event_id, func.count()).group_by(Photo.event_id)
+    return dict(db.execute(stmt).all())
+
+
+def storage_keys_for_event(db: Session, event_id: uuid.UUID) -> list[tuple[str, str, str]]:
+    """`(original, preview, thumb)` storage keys for every photo of an event.
+
+    Selects columns, not ORM objects, so memory stays flat even on a
+    many-thousand-photo event -- this exists only to feed a storage sweep
+    before deleting the event.
+    """
+    stmt = select(
+        Photo.storage_key_original, Photo.storage_key_preview, Photo.storage_key_thumb
+    ).where(Photo.event_id == event_id)
+    return [tuple(row) for row in db.execute(stmt).all()]

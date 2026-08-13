@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import shutil
+from collections.abc import Sequence
 from pathlib import Path
 from typing import BinaryIO
 
@@ -65,3 +66,7 @@ class LocalStorage:
 
     def delete(self, key: str, visibility: Visibility = "private") -> None:
         self._path(key).unlink(missing_ok=True)
+
+    def delete_many(self, keys: Sequence[str], visibility: Visibility = "private") -> None:
+        for key in keys:
+            self.delete(key, visibility)

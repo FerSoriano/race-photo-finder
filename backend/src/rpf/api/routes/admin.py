@@ -1,5 +1,6 @@
-"""Admin ingest endpoints, used by the `rpf upload` CLI.
+"""Admin endpoints: event CRUD, stats, covers, and photo ingest.
 
+Used by the `rpf` CLI (`upload`, `publish`) and by the `/admin` panel.
 Guarded by X-Admin-Key. The server stays the only writer of the database and
 object storage, so validation lives in exactly one place.
 """
@@ -9,37 +10,65 @@ from __future__ import annotations
 import hashlib
 import json
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, File, Form, HTTPException, Response, UploadFile, status
 from pydantic import TypeAdapter, ValidationError
 
 from rpf.api.deps import AdminGuard, AnyEvent, AppSettings, DbSession, Storage
-from rpf.repositories import events as event_repo
 from rpf.repositories import photos as photo_repo
-from rpf.schemas.events import EventCreate, EventRead, EventUpdate
+from rpf.schemas.admin import AdminStats
+from rpf.schemas.events import EventCreate, EventRead, EventUpdate, EventWithCount
 from rpf.schemas.photos import BibIngest, PhotoIngestResult
 from rpf.services import cover as cover_service
+from rpf.services import events as events_service
 from rpf.services import ingest as ingest_service
+from rpf.services import stats as stats_service
 
 router = APIRouter(prefix="/v1/admin", tags=["admin"], dependencies=[AdminGuard])
 
 _bibs_adapter = TypeAdapter(list[BibIngest])
 
 
+@router.get("/stats", response_model=AdminStats)
+def get_stats(db: DbSession) -> AdminStats:
+    return stats_service.collect(db)
+
+
+@router.get("/events", response_model=list[EventWithCount])
+def list_events(db: DbSession) -> list[EventWithCount]:
+    """Every event, published or draft -- the public route hides drafts."""
+    return [
+        EventWithCount(**EventRead.model_validate(event).model_dump(), photo_count=count)
+        for event, count in events_service.list_with_counts(db)
+    ]
+
+
+@router.get("/events/{slug}", response_model=EventWithCount)
+def get_event(event: AnyEvent, db: DbSession) -> EventWithCount:
+    """Reaches a draft, unlike the public `GET /v1/events/{slug}` -- needed so
+    the admin panel's edit page survives a reload on an unpublished event."""
+    event, count = events_service.get_with_count(db, event)
+    return EventWithCount(**EventRead.model_validate(event).model_dump(), photo_count=count)
+
+
 @router.post("/events", response_model=EventRead, status_code=status.HTTP_201_CREATED)
 def create_event(payload: EventCreate, db: DbSession) -> EventRead:
-    if event_repo.get_by_slug(db, payload.slug) is not None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Event {payload.slug!r} already exists",
-        )
-    event = event_repo.create(db, **payload.model_dump())
+    try:
+        event = events_service.create_event(db, **payload.model_dump())
+    except events_service.EventSlugTakenError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     return EventRead.model_validate(event)
 
 
 @router.patch("/events/{slug}", response_model=EventRead)
 def update_event(event: AnyEvent, payload: EventUpdate, db: DbSession) -> EventRead:
-    updated = event_repo.update(db, event, **payload.model_dump(exclude_unset=True))
+    updated = events_service.update_event(db, event, **payload.model_dump(exclude_unset=True))
     return EventRead.model_validate(updated)
+
+
+@router.delete("/events/{slug}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_event(event: AnyEvent, db: DbSession, storage: Storage) -> Response:
+    events_service.delete_event(db, event=event, storage=storage)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/events/{slug}/cover", response_model=EventRead)

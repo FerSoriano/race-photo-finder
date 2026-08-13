@@ -5,7 +5,8 @@ from __future__ import annotations
 import uuid
 from datetime import date
 
-from sqlalchemy import select
+from sqlalchemy import delete as sa_delete
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from rpf.db.models import Event
@@ -66,3 +67,23 @@ def set_cover_url(db: Session, event: Event, cover_url: str | None) -> Event:
     event.cover_url = cover_url
     db.flush()
     return event
+
+
+def count_by_published(db: Session) -> dict[bool, int]:
+    """`{True: <published count>, False: <draft count>}`. A key can be absent
+    if there are zero events in that state -- callers use `.get(key, 0)`."""
+    stmt = select(Event.is_published, func.count()).group_by(Event.is_published)
+    return dict(db.execute(stmt).all())
+
+
+def delete(db: Session, event: Event) -> None:
+    """A Core `DELETE`, not `db.delete(event)`.
+
+    `Event.photos` is `cascade="all, delete-orphan"` without
+    `passive_deletes=True`, so the ORM path would load every `Photo` and
+    `PhotoBib` into the session and emit one statement per row. This lets
+    Postgres apply the `ON DELETE CASCADE` already declared on those tables in
+    a single statement.
+    """
+    db.execute(sa_delete(Event).where(Event.id == event.id))
+    db.expunge(event)
