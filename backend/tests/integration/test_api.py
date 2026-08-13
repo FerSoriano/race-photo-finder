@@ -122,6 +122,63 @@ class TestEvents:
                 db.execute(text("DELETE FROM events WHERE slug = 'itest-hidden'"))
                 db.commit()
 
+    def test_publish_makes_it_visible(self, client, admin):
+        client.post(
+            "/v1/admin/events",
+            headers=admin,
+            json={"slug": "itest-publish", "name": "Draft"},
+        )
+        try:
+            assert client.get("/v1/events/itest-publish").status_code == 404
+
+            response = client.patch(
+                "/v1/admin/events/itest-publish", headers=admin, json={"is_published": True}
+            )
+            assert response.status_code == 200
+            assert response.json()["is_published"] is True
+            assert client.get("/v1/events/itest-publish").status_code == 200
+        finally:
+            with get_session_factory()() as db:
+                db.execute(text("DELETE FROM events WHERE slug = 'itest-publish'"))
+                db.commit()
+
+    def test_unpublish_hides_it_again_without_deleting_it(self, client, admin, event, jpeg_bytes):
+        _upload(client, admin, jpeg_bytes, ["19131"])
+
+        response = client.patch(
+            f"/v1/admin/events/{SLUG}", headers=admin, json={"is_published": False}
+        )
+        assert response.status_code == 200
+        assert response.json()["is_published"] is False
+        assert client.get(f"/v1/events/{SLUG}").status_code == 404
+
+        # The row itself is untouched -- only public visibility changed. The
+        # public search 404s along with the event (it also requires
+        # PublishedEvent), so check via the admin-only hashes endpoint instead.
+        hashes = client.get(f"/v1/admin/events/{SLUG}/photos/hashes", headers=admin).json()
+        assert len(hashes) == 1
+        assert client.get(f"/v1/events/{SLUG}/photos", params={"bib": "19131"}).status_code == 404
+
+    def test_update_only_touches_fields_that_were_sent(self, client, admin, event):
+        response = client.patch(
+            f"/v1/admin/events/{SLUG}", headers=admin, json={"location": "Guadalajara"}
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body["location"] == "Guadalajara"
+        assert body["name"] == "Integration Race"
+        assert body["is_published"] is True
+
+    def test_update_requires_admin_key(self, client, event):
+        response = client.patch(f"/v1/admin/events/{SLUG}", json={"is_published": True})
+        assert response.status_code == 401
+
+    def test_update_unknown_event_is_a_404(self, client, admin):
+        response = client.patch(
+            "/v1/admin/events/itest-nope", headers=admin, json={"is_published": True}
+        )
+        assert response.status_code == 404
+
 
 class TestIngest:
     def test_upload_then_search(self, client, admin, event, jpeg_bytes):
@@ -275,6 +332,170 @@ class TestCover:
         )
         assert response.status_code == 200
         assert f"events/{SLUG}/cover.png" in response.json()["cover_url"]
+
+
+class TestAdminStats:
+    """The dashboard's counts. The integration DB is not truncated between
+    tests -- assert deltas, never absolute counts."""
+
+    def test_counts_move_by_exactly_what_was_created(self, client, admin, event, jpeg_bytes):
+        before = client.get("/v1/admin/stats", headers=admin).json()
+
+        client.post(
+            "/v1/admin/events", headers=admin, json={"slug": "itest-draft", "name": "Draft"}
+        )
+        _upload(client, admin, jpeg_bytes, ["19131"])
+        try:
+            after = client.get("/v1/admin/stats", headers=admin).json()
+            assert after["events_total"] == before["events_total"] + 1
+            assert after["events_draft"] == before["events_draft"] + 1
+            assert after["events_published"] == before["events_published"]
+            assert after["photos_total"] == before["photos_total"] + 1
+        finally:
+            with get_session_factory()() as db:
+                db.execute(text("DELETE FROM events WHERE slug = 'itest-draft'"))
+                db.commit()
+
+    def test_requires_admin_key(self, client):
+        assert client.get("/v1/admin/stats").status_code == 401
+
+
+class TestAdminEventList:
+    def test_lists_drafts_the_public_route_hides(self, client, admin):
+        client.post(
+            "/v1/admin/events", headers=admin, json={"slug": "itest-draft-list", "name": "Draft"}
+        )
+        try:
+            admin_slugs = {e["slug"] for e in client.get("/v1/admin/events", headers=admin).json()}
+            assert "itest-draft-list" in admin_slugs
+            public_slugs = {e["slug"] for e in client.get("/v1/events").json()}
+            assert "itest-draft-list" not in public_slugs
+        finally:
+            with get_session_factory()() as db:
+                db.execute(text("DELETE FROM events WHERE slug = 'itest-draft-list'"))
+                db.commit()
+
+    def test_rows_carry_the_photo_count(self, client, admin, event, jpeg_bytes):
+        _upload(client, admin, jpeg_bytes, ["1"], "a.jpg")
+        _upload(client, admin, jpeg_bytes + b"x", ["2"], "b.jpg")
+        rows = client.get("/v1/admin/events", headers=admin).json()
+        row = next(r for r in rows if r["slug"] == SLUG)
+        assert row["photo_count"] == 2
+
+    def test_an_event_with_no_photos_reports_zero(self, client, admin, event):
+        """Regression guard: counts_by_event's GROUP BY omits events with zero
+        photos, so a missing `.get(id, 0)` would drop the row or crash."""
+        rows = client.get("/v1/admin/events", headers=admin).json()
+        row = next(r for r in rows if r["slug"] == SLUG)
+        assert row["photo_count"] == 0
+
+    def test_requires_admin_key(self, client):
+        assert client.get("/v1/admin/events").status_code == 401
+
+
+class TestAdminEventDetail:
+    def test_reaches_a_draft(self, client, admin):
+        """Unlike the public GET /v1/events/{slug}, which 404s on a draft."""
+        client.post(
+            "/v1/admin/events", headers=admin, json={"slug": "itest-draft-detail", "name": "Draft"}
+        )
+        try:
+            response = client.get("/v1/admin/events/itest-draft-detail", headers=admin)
+            assert response.status_code == 200
+            assert response.json()["is_published"] is False
+        finally:
+            with get_session_factory()() as db:
+                db.execute(text("DELETE FROM events WHERE slug = 'itest-draft-detail'"))
+                db.commit()
+
+    def test_carries_the_photo_count(self, client, admin, event, jpeg_bytes):
+        _upload(client, admin, jpeg_bytes, ["19131"])
+        response = client.get(f"/v1/admin/events/{SLUG}", headers=admin)
+        assert response.json()["photo_count"] == 1
+
+    def test_unknown_event_is_a_404(self, client, admin):
+        assert client.get("/v1/admin/events/itest-nope", headers=admin).status_code == 404
+
+    def test_requires_admin_key(self, client, event):
+        assert client.get(f"/v1/admin/events/{SLUG}").status_code == 401
+
+
+class TestAdminEventDelete:
+    """The one destructive route. Storage cleanup isn't observable through the
+    API, so these check tmp_path directly -- the `client` fixture pins
+    local_storage_root to it."""
+
+    def test_delete_removes_the_row_and_its_photos(self, client, admin, event, jpeg_bytes):
+        _upload(client, admin, jpeg_bytes, ["19131"])
+        assert client.delete(f"/v1/admin/events/{SLUG}", headers=admin).status_code == 204
+
+        assert (
+            client.get(f"/v1/admin/events/{SLUG}/photos/hashes", headers=admin).status_code == 404
+        )
+        assert client.get(f"/v1/events/{SLUG}").status_code == 404
+
+        # Recreating the same slug proves the row is gone, not merely hidden --
+        # a lingering row would 409 here.
+        recreated = client.post(
+            "/v1/admin/events", headers=admin, json={"slug": SLUG, "name": "again"}
+        )
+        assert recreated.status_code == 201
+
+    def test_delete_removes_the_stored_objects(self, client, admin, event, jpeg_bytes, tmp_path):
+        _upload(client, admin, jpeg_bytes, ["19131"])
+        event_dir = tmp_path / "events" / SLUG
+        assert any(p.is_file() for p in event_dir.rglob("*"))
+
+        assert client.delete(f"/v1/admin/events/{SLUG}", headers=admin).status_code == 204
+        # `delete_many` unlinks files but leaves empty directories behind --
+        # that is fine, only leftover *objects* would be a bug.
+        assert not any(p.is_file() for p in event_dir.rglob("*"))
+
+    def test_delete_removes_the_cover_object(self, client, admin, event, jpeg_bytes, tmp_path):
+        client.post(
+            f"/v1/admin/events/{SLUG}/cover",
+            headers=admin,
+            files={"file": ("cover.jpg", jpeg_bytes, "image/jpeg")},
+        )
+        cover_path = tmp_path / "events" / SLUG / "cover.jpg"
+        assert cover_path.exists()
+
+        assert client.delete(f"/v1/admin/events/{SLUG}", headers=admin).status_code == 204
+        assert not cover_path.exists()
+
+    def test_delete_leaves_another_events_objects_alone(
+        self, client, admin, event, jpeg_bytes, tmp_path
+    ):
+        """Guards against ever "optimising" the sweep into a prefix delete."""
+        _upload(client, admin, jpeg_bytes, ["19131"])
+        assert (
+            client.post(
+                "/v1/admin/events",
+                headers=admin,
+                json={"slug": "itest-other-delete", "name": "Other", "is_published": True},
+            ).status_code
+            == 201
+        )
+        try:
+            other_bytes = jpeg_bytes + b"other"
+            client.post(
+                "/v1/admin/events/itest-other-delete/photos",
+                headers=admin,
+                files={"file": ("q.jpg", other_bytes, "image/jpeg")},
+                data={"sha256": hashlib.sha256(other_bytes).hexdigest(), "bibs": "[]"},
+            )
+            assert client.delete(f"/v1/admin/events/{SLUG}", headers=admin).status_code == 204
+            assert any((tmp_path / "events" / "itest-other-delete").rglob("*"))
+        finally:
+            with get_session_factory()() as db:
+                db.execute(text("DELETE FROM events WHERE slug = 'itest-other-delete'"))
+                db.commit()
+
+    def test_delete_unknown_event_is_a_404(self, client, admin):
+        assert client.delete("/v1/admin/events/itest-nope", headers=admin).status_code == 404
+
+    def test_delete_requires_admin_key(self, client, event):
+        assert client.delete(f"/v1/admin/events/{SLUG}").status_code == 401
 
 
 class TestBulkDownload:

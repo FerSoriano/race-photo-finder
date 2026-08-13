@@ -1,4 +1,4 @@
-.PHONY: help setup up down dev api front front-setup dev-all test test-all lint fmt migrate migration detect upload clean
+.PHONY: help setup up down dev api front front-setup dev-all stop-api stop-front stop-all test test-all lint fmt migrate migration detect upload clean
 
 BACKEND := backend
 UV := uv --project $(BACKEND)
@@ -36,6 +36,14 @@ dev-all: setup up migrate front-setup ## Backend + frontend together in one term
 	@trap 'kill 0' EXIT INT TERM; \
 	($(UV) run uvicorn rpf.main:app --reload --host 0.0.0.0 --port 8000) & \
 	(cd frontend && npm run dev)
+
+stop-api: ## Stop the API dev server (port 8000)
+	@lsof -ti tcp:8000 | xargs kill 2>/dev/null && echo "Stopped API on :8000" || echo "Nothing running on :8000"
+
+stop-front: ## Stop the frontend dev server (port 5173)
+	@lsof -ti tcp:5173 | xargs kill 2>/dev/null && echo "Stopped frontend on :5173" || echo "Nothing running on :5173"
+
+stop-all: stop-api stop-front down ## Stop API, frontend, and containers
 
 # These cd into backend/ so pytest and ruff pick up backend/pyproject.toml.
 # Run from the repo root and its [tool.pytest.ini_options] is silently ignored,

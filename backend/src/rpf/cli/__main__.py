@@ -1,8 +1,9 @@
 """The `rpf` command.
 
-Two steps, matching the real-world workflow:
+Matches the real-world workflow:
     rpf detect <folder> --event <slug>     # race day, offline
     rpf upload --event <slug> --manifest … # back at the office, online
+    rpf publish --event <slug>             # make it visible on the public API
 """
 
 from __future__ import annotations
@@ -10,6 +11,7 @@ from __future__ import annotations
 import typer
 
 from rpf.cli.detect import detect
+from rpf.cli.publish import publish
 from rpf.cli.upload import upload
 
 app = typer.Typer(
@@ -19,6 +21,7 @@ app = typer.Typer(
 )
 app.command("detect")(detect)
 app.command("upload")(upload)
+app.command("publish")(publish)
 
 
 if __name__ == "__main__":
