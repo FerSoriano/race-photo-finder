@@ -1,6 +1,6 @@
 # Project status
 
-Last updated: 2026-08-12
+Last updated: 2026-08-12 (evening)
 
 Tracks what's done, what's pending, and future phases. Split into Backend and
 Frontend. See `CLAUDE.md` for the rule that keeps this current.
@@ -33,6 +33,14 @@ Frontend. See `CLAUDE.md` for the rule that keeps this current.
   content-type, stored in the public bucket at `events/{slug}/cover.{ext}`.
   `EventRead.cover_url` is `None` when unset, so the frontend's gradient
   placeholder stays the fallback.
+- Event publishing: `PATCH /v1/admin/events/{slug}` (partial update — a field
+  left out of the request is untouched, `EventUpdate.model_dump(exclude_unset=True)`)
+  and `rpf publish --event <slug>` / `--undo` on top of it. Closes the gap
+  `docs/WORKFLOW.md` step 5 used to describe ("flip `is_published` to true")
+  with no actual command behind it. Unpublishing only hides an event from the
+  public routes (`PublishedEvent`, both event detail and photo search) — it is
+  not a soft delete, the row and its photos are untouched and still reachable
+  by the admin (`AnyEvent`).
 - Dev stack: Postgres (host port 5433) + MinIO via `make up` / `migrate` /
   `api`.
 - Unit + integration test suite (config, derivatives, manifest, normalize,

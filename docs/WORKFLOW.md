@@ -78,7 +78,16 @@ appears in a photo.
 
 ## 5. Publish
 
-Flip `is_published` to true, then announce on social media.
+```bash
+uv --project backend run rpf publish --event 21k-gdl-2026 \
+  --api-url https://api.yourdomain.com \
+  --admin-key "$RPF_ADMIN_KEY"
+```
+
+This flips `is_published` to true via `PATCH /v1/admin/events/{slug}`. Then
+announce on social media.
+
+Made a mistake and need to pull it back? `rpf publish --event <slug> --undo`.
 
 ## 6. When a runner cannot find their photos
 
