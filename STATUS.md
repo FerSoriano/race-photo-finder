@@ -1,6 +1,6 @@
 # Project status
 
-Last updated: 2026-08-13
+Last updated: 2026-08-14
 
 Tracks what's done, what's pending, and future phases. Split into Backend and
 Frontend. See `CLAUDE.md` for the rule that keeps this current.
@@ -53,6 +53,13 @@ Frontend. See `CLAUDE.md` for the rule that keeps this current.
   public routes (`PublishedEvent`, both event detail and photo search) — it is
   not a soft delete, the row and its photos are untouched and still reachable
   by the admin (`AnyEvent`).
+- Event cover CLI: `rpf cover <slug> <file>` to upload, `rpf cover <slug>
+  --undo` to delete, mirroring `rpf publish`'s shape (404 handling,
+  `--api-url`/`--admin-key` overrides), plus argument checks (file and
+  `--undo` are mutually exclusive, missing file caught before the request).
+  `make cover F=<file> E=<event-slug>` alongside `detect`/`upload`. Closes
+  the last runbook step that meant hand-rolled `curl` — now step 4 in
+  `docs/WORKFLOW.md`, between upload and verify.
 - Dev stack: Postgres (host port 5433) + MinIO via `make up` / `migrate` /
   `api`.
 - Unit + integration test suite (config, derivatives, manifest, normalize,
@@ -61,12 +68,12 @@ Frontend. See `CLAUDE.md` for the rule that keeps this current.
 
 ### Pending
 
-- **No command for the event cover.** `POST /v1/admin/events/{slug}/cover` has
-  no CLI in front of it, so setting a cover means writing `curl` by hand — the
-  only step of the runbook that does. Needs an `rpf cover` command (upload,
-  plus `--undo` for the `DELETE`, mirroring `rpf publish`'s shape) and a
-  `make cover F=<file> E=<event-slug>` target next to `detect` / `upload`.
-  Add the step to `docs/WORKFLOW.md` once it exists.
+- **No command to list events.** Checking which slugs exist today means a
+  hand-rolled `curl` against `GET /v1/admin/events` (already returns every
+  event, draft and published, per `EventWithCount` — no new backend route
+  needed). Needs an `rpf events` command printing at least slug and name,
+  reusing the `httpx`-client-plus-`X-Admin-Key` pattern from `rpf publish` /
+  `rpf cover`.
 - Production deploy configuration (R2 credentials, hosting, etc.) not yet
   set up.
 
