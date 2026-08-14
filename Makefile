@@ -1,4 +1,4 @@
-.PHONY: help setup up down dev api front front-setup dev-all stop-api stop-front stop-all test test-all lint fmt migrate migration detect upload clean
+.PHONY: help setup up down dev api front front-setup dev-all stop-api stop-front stop-all test test-all lint fmt migrate migration detect upload cover clean
 
 BACKEND := backend
 UV := uv --project $(BACKEND)
@@ -76,6 +76,10 @@ detect: ## Detect bibs: make detect F=samples/photos E=my-race
 upload: ## Upload photos: make upload F=samples/photos E=my-race
 	@test -n "$(F)" -a -n "$(E)" || (echo 'Usage: make upload F=<folder> E=<event-slug>' && exit 1)
 	$(UV) run rpf upload --event $(E) --manifest $(F)/manifest.json --create-event
+
+cover: ## Set event cover: make cover F=<file> E=<event-slug>
+	@test -n "$(F)" -a -n "$(E)" || (echo 'Usage: make cover F=<file> E=<event-slug>' && exit 1)
+	$(UV) run rpf cover $(E) $(F)
 
 clean: ## Remove local storage and caches
 	rm -rf $(BACKEND)/var/storage

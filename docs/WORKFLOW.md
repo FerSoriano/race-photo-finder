@@ -66,7 +66,26 @@ bib numbers land in Postgres.
 - Check first without sending anything: add `--dry-run`.
 - The event is created **unpublished**, so nothing is public yet.
 
-## 4. Verify before announcing
+## 4. Set a cover image (optional)
+
+Gives the event a banner on the public listing instead of the frontend's
+gradient placeholder:
+
+```bash
+uv --project backend run rpf cover 21k-gdl-2026 ~/races/21k-gdl-2026/cover.jpg \
+  --api-url https://api.yourdomain.com \
+  --admin-key "$RPF_ADMIN_KEY"
+```
+
+jpg/png/webp, 5MB max. Re-running it replaces the current cover. To remove it:
+
+```bash
+uv --project backend run rpf cover 21k-gdl-2026 --undo \
+  --api-url https://api.yourdomain.com \
+  --admin-key "$RPF_ADMIN_KEY"
+```
+
+## 5. Verify before announcing
 
 ```bash
 curl "https://api.yourdomain.com/v1/events/21k-gdl-2026" \
@@ -76,7 +95,7 @@ curl "https://api.yourdomain.com/v1/events/21k-gdl-2026" \
 Confirm `photo_count` matches what you uploaded, then spot-check a bib you know
 appears in a photo.
 
-## 5. Publish
+## 6. Publish
 
 ```bash
 uv --project backend run rpf publish --event 21k-gdl-2026 \
@@ -89,7 +108,7 @@ announce on social media.
 
 Made a mistake and need to pull it back? `rpf publish --event <slug> --undo`.
 
-## 6. When a runner cannot find their photos
+## 7. When a runner cannot find their photos
 
 1. Confirm the bib is right — they sometimes give the chip number instead.
 2. Search the API directly. If `similar_bibs` comes back populated, the model
