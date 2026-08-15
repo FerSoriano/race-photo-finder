@@ -1,4 +1,4 @@
-.PHONY: help setup up down dev api front front-setup dev-all stop-api stop-front stop-all test test-all lint fmt migrate migration detect upload clean
+.PHONY: help setup up down dev api front front-setup dev-all stop-api stop-front stop-all test test-all lint fmt migrate migration create-event detect upload cover clean
 
 BACKEND := backend
 UV := uv --project $(BACKEND)
@@ -69,6 +69,10 @@ migration: ## Create a migration: make migration M="add orders table"
 	@test -n "$(M)" || (echo 'Usage: make migration M="description"' && exit 1)
 	cd $(BACKEND) && uv run alembic revision --autogenerate -m "$(M)"
 
+create-event: ## Create an event with no photos yet: make create-event E=my-race N="My Race"
+	@test -n "$(E)" -a -n "$(N)" || (echo 'Usage: make create-event E=<event-slug> N="Event Name"' && exit 1)
+	$(UV) run rpf create-event $(E) --name "$(N)"
+
 detect: ## Detect bibs: make detect F=samples/photos E=my-race
 	@test -n "$(F)" -a -n "$(E)" || (echo 'Usage: make detect F=<folder> E=<event-slug>' && exit 1)
 	$(UV) run rpf detect $(F) --event $(E)
@@ -76,6 +80,10 @@ detect: ## Detect bibs: make detect F=samples/photos E=my-race
 upload: ## Upload photos: make upload F=samples/photos E=my-race
 	@test -n "$(F)" -a -n "$(E)" || (echo 'Usage: make upload F=<folder> E=<event-slug>' && exit 1)
 	$(UV) run rpf upload --event $(E) --manifest $(F)/manifest.json --create-event
+
+cover: ## Set event cover: make cover F=<file> E=<event-slug>
+	@test -n "$(F)" -a -n "$(E)" || (echo 'Usage: make cover F=<file> E=<event-slug>' && exit 1)
+	$(UV) run rpf cover $(E) $(F)
 
 clean: ## Remove local storage and caches
 	rm -rf $(BACKEND)/var/storage
