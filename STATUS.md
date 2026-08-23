@@ -184,6 +184,20 @@ Frontend. See `CLAUDE.md` for the rule that keeps this current.
   `is_uncertain` surfaced on the tile, and grid skeletons.
 - `PossibleMatches` redesigned as a recovery path: a real, prominent
   "Sí, soy el {bib}" button instead of an underlined text link.
+- **Photo grid now reliably shows 4 per row on desktop (3 on tablet, 2 on
+  mobile).** The earlier `columns-2 gap-3 sm:columns-3 lg:columns-4` CSS
+  multi-column layout was never actually stuck at 3 columns -- the real bug
+  was CSS multi-column's height *balancing*: with a handful of same-height
+  tiles and 4 columns, the browser fills the minimum number of columns needed
+  (e.g. 6 photos as 2+2+2) and leaves the rest empty, which reads as "3 per
+  row" even though 4 were requested. `PhotoGrid.tsx` now builds real flex
+  columns in JS (`useColumnCount` reads the same breakpoints as Tailwind's
+  `sm`/`lg` via `matchMedia`; `distribute` fills columns shortest-first using
+  each photo's real aspect ratio from `PhotoRead.width`/`height`), so every
+  column is always populated. Verified end-to-end in the browser (Playwright)
+  against real production data (`10k-internacional-comude`, bib `4817`) at
+  desktop/tablet/mobile widths, including the nested grid inside
+  `PossibleMatches`.
 - `SelectionBar`: thumbnail strip of the selected photos with per-photo
   removal, a `3 / 10` cap indicator that warns before the server rejects,
   "Quitar todo" behind an `alert-dialog`, and a toast confirming a download
@@ -228,11 +242,6 @@ Frontend. See `CLAUDE.md` for the rule that keeps this current.
   and the client never sends them, so a bib with many photos renders all at
   once.
 - **Selection is lost on reload** — it lives in page state, not the URL.
-- **Photo grid should show 4 per row on web, not 3.** `PhotoGrid.tsx` (both
-  the results and skeleton containers, lines 24 and 40) uses
-  `columns-2 gap-3 sm:columns-3 lg:columns-4` — desktop viewports land in
-  the `sm:columns-3` range before hitting `lg`. Requested by the user after
-  checking the deployed grid.
 
 ### Future phases
 
