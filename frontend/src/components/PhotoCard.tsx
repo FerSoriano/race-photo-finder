@@ -36,7 +36,7 @@ export function PhotoCard({
   return (
     <Dialog>
       <div
-        className={`group relative mb-3 break-inside-avoid overflow-hidden rounded-lg bg-card ${
+        className={`group relative overflow-hidden rounded-lg bg-card ${
           selected ? 'ring-2 ring-primary ring-inset' : ''
         }`}
       >
@@ -102,7 +102,7 @@ export function PhotoCard({
 export function PhotoCardSkeleton({ tall }: { tall?: boolean }) {
   return (
     <Skeleton
-      className={`mb-3 w-full break-inside-avoid rounded-lg ${tall ? 'h-56' : 'h-40'}`}
+      className={`w-full rounded-lg ${tall ? 'h-56' : 'h-40'}`}
     />
   )
 }
