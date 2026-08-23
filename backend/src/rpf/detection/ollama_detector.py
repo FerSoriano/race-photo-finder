@@ -7,11 +7,13 @@ sample photos.
 
 from __future__ import annotations
 
+import io
 import json
 import re
 from pathlib import Path
 
 import ollama
+from PIL import Image, ImageOps
 
 from rpf.detection.base import Bib
 from rpf.detection.normalize import normalize_bibs
@@ -50,21 +52,54 @@ def list_photos(folder: Path) -> list[Path]:
     )
 
 
+def _resized_jpeg(photo: Path, max_dimension: int) -> bytes:
+    """Downscale to a long-edge bound before sending to the model.
+
+    Cuts vision-token count (and with it, time and per-request KV-cache RAM)
+    without a meaningful legibility cost for bib numbers. Photos already
+    within the bound are sent untouched -- re-encoding them would only add
+    JPEG generation loss for no size benefit.
+    """
+    with Image.open(photo) as image:
+        if max(image.size) <= max_dimension:
+            return photo.read_bytes()
+        image = ImageOps.exif_transpose(image)
+        image.thumbnail((max_dimension, max_dimension), Image.LANCZOS)
+        buffer = io.BytesIO()
+        image.convert("RGB").save(buffer, format="JPEG", quality=90)
+        return buffer.getvalue()
+
+
 class OllamaBibDetector:
     """Implements `BibDetector` using a local Ollama vision model."""
 
-    def __init__(self, model: str = "qwen2.5vl:7b", host: str | None = None) -> None:
+    def __init__(
+        self,
+        model: str = "qwen2.5vl:7b",
+        host: str | None = None,
+        max_dimension: int = 1280,
+    ) -> None:
         self._model = model
         self._client = ollama.Client(host=host) if host else ollama
+        self._max_dimension = max_dimension
 
     @property
     def name(self) -> str:
         return self._model
 
     def detect(self, photo: Path) -> list[Bib]:
+        options = {"temperature": 0}
+        if self._max_dimension:
+            image = _resized_jpeg(photo, self._max_dimension)
+            # A 1280px-bounded photo needs ~1.7K prompt tokens (measured);
+            # 4096 leaves headroom without over-allocating KV-cache RAM.
+            # Only capped when resizing -- an uncapped original can exceed it.
+            options["num_ctx"] = 4096
+        else:
+            image = str(photo)
         response = self._client.chat(
             model=self._model,
-            messages=[{"role": "user", "content": PROMPT, "images": [str(photo)]}],
-            options={"temperature": 0},
+            messages=[{"role": "user", "content": PROMPT, "images": [image]}],
+            options=options,
         )
         return normalize_bibs(parse_response(response["message"]["content"]))

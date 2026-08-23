@@ -1,6 +1,6 @@
 # Project status
 
-Last updated: 2026-08-14
+Last updated: 2026-08-23
 
 Tracks what's done, what's pending, and future phases. Split into Backend and
 Frontend. See `CLAUDE.md` for the rule that keeps this current.
@@ -62,6 +62,18 @@ Frontend. See `CLAUDE.md` for the rule that keeps this current.
   `docs/WORKFLOW.md`, between upload and verify.
 - Dev stack: Postgres (host port 5433) + MinIO via `make up` / `migrate` /
   `api`.
+- Detection performance: `rpf detect` downscales photos to a 1280px long
+  edge (`Settings.detection_max_dimension`) in memory before sending to
+  Ollama (`ollama_detector.py::_resized_jpeg`, Pillow, same pattern as
+  `derivatives.py`), skipping the re-encode when a photo is already within
+  bounds. Paired with an explicit `num_ctx: 4096` cap, applied only when
+  resizing (an uncapped full-resolution photo can need more than that).
+  Measured on 6 real 4032x3024 race photos: ~20.3s/photo -> ~6.75s/photo,
+  `llama-server` RSS ~10.1GB -> ~8.5GB. `rpf detect --max-dimension 0` opts
+  back into full resolution for comparison. Regression check
+  (`21k-gdl-3.jpg` -> `19131, 6133, 13441`) still holds. Concurrency
+  (multiple Ollama requests in parallel) was deliberately not pursued here —
+  a single request already used most of the test machine's 24GB of RAM.
 - Unit + integration test suite (config, derivatives, manifest, normalize,
   search, storage, API).
 - Docs: `docs/ARCHITECTURE.md`, `docs/DATA_MODEL.md`, `docs/WORKFLOW.md`.
@@ -103,6 +115,19 @@ Frontend. See `CLAUDE.md` for the rule that keeps this current.
   the dashboard. `link_for` is already documented as the single choke point
   future payment gating goes through, so build both in the same pass rather
   than touching that function twice.
+- **RAM growth pattern during long `rpf detect` runs -- needs investigation
+  before deciding on a fix.** Observed on a real ~400-photo run (after the
+  1280px resize above): RAM stays ~8GB for the first ~50-60 photos, climbs
+  gradually to ~15GB by photo ~180, holds there until ~260, then climbs
+  again to ~15.5GB. Reproduced on a second run with the same shape (low for
+  the first 50-60 photos each time, then the same climb). Not yet
+  diagnosed -- candidates include Ollama-side KV-cache/context accumulation
+  across sequential requests within a `keep_alive` window, allocator
+  behavior in the `ollama` Python client, or something specific to this
+  photo set. Idea to explore: cycle/restart the model every ~50 photos
+  (e.g. 2 workers alternating in batches of 50) to reset accumulated memory
+  before it climbs. Needs profiling (`ollama ps`, process RSS over the
+  course of a run) before committing to that or any other fix.
 - Scoped admin session token. `/admin` now holds `X-Admin-Key` in the
   browser's `localStorage` — the same long-lived secret `rpf upload` uses,
   with full ingest and delete power, capped only by a 30-day client-side

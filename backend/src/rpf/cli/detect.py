@@ -27,12 +27,20 @@ def detect(
         typer.Option("--manifest", "-m", help="Manifest file (default: <folder>/manifest.json)"),
     ] = None,
     model: Annotated[str | None, typer.Option("--model", help="Ollama model")] = None,
+    max_dimension: Annotated[
+        int | None,
+        typer.Option(
+            "--max-dimension",
+            help="Long-edge px sent to the model; 0 disables resizing (default: settings)",
+        ),
+    ] = None,
     force: Annotated[
         bool, typer.Option("--force", help="Re-analyze photos already in the manifest")
     ] = False,
 ) -> None:
     settings = get_settings()
     model = model or settings.ollama_model
+    max_dimension = settings.detection_max_dimension if max_dimension is None else max_dimension
 
     if not folder.is_dir():
         typer.secho(f"Folder not found: {folder}", fg=typer.colors.RED, err=True)
@@ -54,7 +62,9 @@ def detect(
         f"{len(pending)} to analyze with '{model}'"
     )
 
-    detector = OllamaBibDetector(model=model, host=settings.ollama_host)
+    detector = OllamaBibDetector(
+        model=model, host=settings.ollama_host, max_dimension=max_dimension
+    )
 
     for i, photo in enumerate(pending, 1):
         prefix = f"[{i}/{len(pending)}] {photo.name}"
