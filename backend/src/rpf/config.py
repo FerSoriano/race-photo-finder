@@ -63,6 +63,9 @@ class Settings(BaseSettings):
     # --- Detection ------------------------------------------------------
     ollama_model: str = "qwen2.5vl:7b"
     ollama_host: str | None = None
+    # Long-edge px sent to the vision model; 0 disables resizing. Bigger
+    # photos mean more vision tokens, which cost both time and KV-cache RAM.
+    detection_max_dimension: int = 1280
 
     @model_validator(mode="after")
     def _check_production_safety(self) -> Settings:
