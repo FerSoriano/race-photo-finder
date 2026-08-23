@@ -228,6 +228,11 @@ Frontend. See `CLAUDE.md` for the rule that keeps this current.
   and the client never sends them, so a bib with many photos renders all at
   once.
 - **Selection is lost on reload** — it lives in page state, not the URL.
+- **Photo grid should show 4 per row on web, not 3.** `PhotoGrid.tsx` (both
+  the results and skeleton containers, lines 24 and 40) uses
+  `columns-2 gap-3 sm:columns-3 lg:columns-4` — desktop viewports land in
+  the `sm:columns-3` range before hitting `lg`. Requested by the user after
+  checking the deployed grid.
 
 ### Future phases
 
